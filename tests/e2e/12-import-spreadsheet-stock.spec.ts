@@ -31,8 +31,13 @@ test('imports spreadsheet quantities by default and keeps the confirmation sheet
   await page.getByTestId('confirm-accept').click()
   await expect(page.getByTestId('import-result')).toContainText(`Created ${created}, updated ${updated}, skipped 0`)
 
+  // q matches name OR variant (see server/api/products/index.get.ts), so this
+  // can also pick up an unrelated product from another spec's fixture whose
+  // variant happens to contain "lucky 7" (e.g. 02-import.spec.ts's workbook
+  // has a "sardines" product with variant "lucky 7") when specs share one
+  // database. Filter to the exact product this import created.
   const lucky7 = await request.get('/api/products', { params: { q: 'Lucky 7' } })
-  const lucky7Rows = await lucky7.json()
+  const lucky7Rows = (await lucky7.json()).filter((p: { name: string }) => p.name === 'Lucky 7')
   expect(lucky7Rows).toHaveLength(1)
   expect(lucky7Rows[0].stock).toBe(99)
 })

@@ -6,7 +6,11 @@ test('adding a second product does not reload the catalog or bury the cart', asy
   await createProduct(request, { name: 'ResetCheckB', costPrice: 300, sellingPrice: 600, stock: 10 })
 
   await page.goto('/sales/new')
-  await expect(page.getByText('Search for a product to add it to the cart.')).toBeVisible()
+  // Idle state is either the plain hint or a browse list of frequently-sold
+  // products (app/pages/sales/new.vue) depending on what earlier specs have
+  // already sold in this shared database - assert the search box itself
+  // rather than which idle state is showing.
+  await expect(page.getByTestId('product-search')).toBeVisible()
 
   await page.getByTestId('product-search').fill('ResetCheckA')
   await page.getByTestId('search-result').first().click()

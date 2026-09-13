@@ -23,7 +23,7 @@ const TONE_ACCENT: Record<ToastTone, string> = {
 
 <template>
   <div
-    class="safe-bottom pointer-events-none fixed inset-x-0 bottom-28 z-50 mx-auto flex max-w-md flex-col gap-2 px-4"
+    class="safe-bottom pointer-events-none fixed inset-x-0 bottom-28 z-50 mx-auto flex max-w-md flex-col gap-2 px-4 lg:bottom-6"
     aria-label="Notifications"
   >
     <TransitionGroup name="toast">

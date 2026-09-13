@@ -48,14 +48,14 @@ async function submit() {
 </script>
 
 <template>
-  <div v-if="forced" class="flex min-h-screen flex-col justify-center bg-brand-700 px-6 text-white">
-    <div class="mx-auto w-full max-w-sm">
-      <div class="mb-8 text-center">
-        <h1 class="text-2xl font-bold">Set your password</h1>
-        <p class="mt-1 text-brand-100">Choose your own password before using the store app.</p>
+  <div v-if="forced" class="flex min-h-screen flex-col justify-start bg-canvas px-6 pt-16 lg:justify-center lg:pt-0">
+    <div class="mx-auto w-full max-w-[380px]">
+      <div class="mb-8">
+        <h1 class="text-2xl font-bold text-ink">Set your password</h1>
+        <p class="mt-1 text-sm text-ink-subtle">Choose your own password before using the store app.</p>
       </div>
 
-      <form class="space-y-4 rounded-[var(--radius-card)] bg-surface p-5 text-ink shadow-[var(--shadow-raised)]" @submit.prevent="submit">
+      <form class="space-y-4" @submit.prevent="submit">
         <AppField label="Current (temporary) password" for="current-password">
           <PasswordField id="current-password" v-model="currentPassword" testid="current-password" autocomplete="current-password" />
         </AppField>
@@ -77,7 +77,7 @@ async function submit() {
 
   <div v-else>
     <PageHeader title="Change Password" />
-    <div class="px-4 py-4">
+    <div class="page-shell page-shell--form">
       <form class="space-y-4 rounded-[var(--radius-card)] border border-line bg-surface p-4" @submit.prevent="submit">
         <AppField label="Current password" for="current-password">
           <PasswordField id="current-password" v-model="currentPassword" testid="current-password" autocomplete="current-password" />

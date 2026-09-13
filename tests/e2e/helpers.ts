@@ -45,6 +45,8 @@ export async function loginAs(page: Page, username: string, password: string) {
   await page.context().clearCookies()
   await page.goto('/login')
   await page.getByLabel('Username').fill(username)
-  await page.getByLabel('Password').fill(password)
+  // exact: true - a substring match would also catch the show/hide toggle's
+  // aria-label="Show password" (login.vue's PasswordField).
+  await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Sign In' }).click()
 }

@@ -9,11 +9,13 @@ export default defineEventHandler(async (event) => {
   const totals = await getSalesTotals(range)
   const topProducts = await getTopProducts(range, 10)
   const lowestStock = await getLowestStockProducts(10)
+  const series = await getDailySeries(range)
 
   return {
     start: storeDateKey(range.start),
     end: storeDateKey(new Date(range.end.getTime() - 24 * 60 * 60 * 1000)),
     ...totals,
+    series,
     topProducts,
     lowestStock,
   }

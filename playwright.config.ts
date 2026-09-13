@@ -15,7 +15,16 @@ export default defineConfig({
   projects: [
     {
       name: 'mobile-chrome',
+      testIgnore: /20-desktop-workspace\.spec\.ts/,
       use: { ...devices['Pixel 7'], storageState: './tests/e2e/.auth/storage-state.json' },
+    },
+    {
+      // Desktop-only coverage (docs/2026-09-13-pos-redesign.md's sidebar
+      // workspace) lives in its own project rather than doubling every
+      // existing mobile-tap/viewport-tuned spec onto a second viewport.
+      name: 'desktop-chrome',
+      testMatch: /20-desktop-workspace\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], storageState: './tests/e2e/.auth/storage-state.json' },
     },
   ],
   webServer: {

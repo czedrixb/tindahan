@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { PhChartLineUp, PhCoins, PhPackage, PhReceipt, PhWallet } from '@phosphor-icons/vue'
 import type { DashboardSummary } from '~/types'
 
 const { data, refresh, pending, error } = useLazyFetch<DashboardSummary>('/api/dashboard/today')
@@ -7,9 +6,9 @@ const { data, refresh, pending, error } = useLazyFetch<DashboardSummary>('/api/d
 
 <template>
   <div>
-    <HomeHeader title="Today's Summary" :subtitle="data ? formatDateLabel(data.date) : undefined" />
+    <HomeHeader title="Today" :subtitle="data ? formatDateLabel(data.date) : undefined" />
 
-    <div class="space-y-6 px-4 py-4">
+    <div class="page-shell space-y-6">
       <AppSkeleton v-if="pending && !data" variant="stat-grid" />
 
       <div v-else-if="error" class="space-y-3 rounded-[var(--radius-card)] border border-danger-200 bg-danger-50 p-4 text-sm text-danger-600">
@@ -18,51 +17,56 @@ const { data, refresh, pending, error } = useLazyFetch<DashboardSummary>('/api/d
       </div>
 
       <template v-else-if="data">
-        <div class="grid grid-cols-2 gap-3">
-          <StatTile label="Sales" :value="formatPeso(data.revenue)" tone="brand" :icon="PhCoins" />
-          <StatTile label="Cost" :value="formatPeso(data.cost)" tone="accent" :icon="PhWallet" />
-          <StatTile label="Profit" :value="formatPeso(data.profit)" tone="teal" :icon="PhChartLineUp" />
-          <StatTile label="Items Sold" :value="String(data.itemsSold)" tone="amber" :icon="PhPackage" />
-        </div>
-        <StatTile label="Transactions" :value="String(data.transactions)" :icon="PhReceipt" />
-
-        <section>
-          <h2 class="mb-2 text-sm font-semibold text-ink-muted">Quick Actions</h2>
-          <div class="grid grid-cols-2 gap-3">
-            <NuxtLink to="/sales/new" class="press focus-ring rounded-[var(--radius-control)] bg-brand-600 px-4 py-3 text-center text-sm font-semibold text-white active:bg-brand-700">
-              Add Sale
-            </NuxtLink>
-            <NuxtLink to="/inventory" class="press focus-ring rounded-[var(--radius-control)] bg-teal-50 px-4 py-3 text-center text-sm font-semibold text-teal-700 active:bg-teal-100">
-              View Inventory
-            </NuxtLink>
-            <NuxtLink to="/sales" class="press focus-ring rounded-[var(--radius-control)] border border-line bg-surface px-4 py-3 text-center text-sm font-semibold text-ink active:bg-neutral-50">
-              Sales History
-            </NuxtLink>
-            <NuxtLink to="/inventory/count" class="press focus-ring rounded-[var(--radius-control)] border border-line bg-surface px-4 py-3 text-center text-sm font-semibold text-ink active:bg-neutral-50">
-              Inventory Count
-            </NuxtLink>
+        <div class="flex items-start justify-between gap-4">
+          <div class="grid grow grid-cols-2 gap-4 lg:flex lg:items-start lg:gap-10">
+            <StatTile label="Sales" :value="formatPeso(data.revenue)" />
+            <StatTile label="Cost" :value="formatPeso(data.cost)" />
+            <StatTile label="Profit" :value="formatPeso(data.profit)" />
+            <StatTile label="Transactions" :value="String(data.transactions)" />
           </div>
-        </section>
+          <NuxtLink
+            to="/sales/new"
+            class="press focus-ring shrink-0 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white active:bg-brand-700"
+          >
+            New sale
+          </NuxtLink>
+        </div>
 
-        <section v-if="data.lowStock.length">
-          <h2 class="mb-2 text-sm font-semibold text-ink-muted">Low Stock</h2>
-          <ul class="divide-y divide-warn-200 overflow-hidden rounded-[var(--radius-card)] border border-warn-200 bg-warn-50">
-            <li
-              v-for="(p, i) in data.lowStock"
-              :key="p.id"
-              class="list-enter-item flex items-center justify-between px-4 py-3"
-              :style="{ '--i': i }"
-            >
-              <div>
-                <p class="font-medium text-ink">{{ p.name }}<span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span></p>
-                <p class="text-xs text-warn-700">{{ p.stock }} remaining</p>
-              </div>
-              <NuxtLink :to="`/products/${p.id}`" class="press focus-ring rounded-[var(--radius-control)] bg-warn-100 px-3 py-1.5 text-xs font-semibold text-warn-700">
-                Restock
-              </NuxtLink>
-            </li>
-          </ul>
-        </section>
+        <div class="grid gap-6 lg:grid-cols-2">
+          <section v-if="data.lowStock.length">
+            <h2 class="mb-2 text-sm font-semibold text-ink-muted">Needs restocking</h2>
+            <ul class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
+              <li
+                v-for="(p, i) in data.lowStock"
+                :key="p.id"
+                class="list-enter-item flex items-center justify-between px-4 py-3"
+                :style="{ '--i': i }"
+              >
+                <div>
+                  <p class="font-medium text-ink">{{ p.name }}<span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span></p>
+                  <p class="text-xs"><span class="font-semibold text-warn-700">{{ p.stock }}</span> <span class="text-ink-subtle">remaining</span></p>
+                </div>
+                <NuxtLink :to="`/products/${p.id}`" class="press focus-ring rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-ink">
+                  Restock
+                </NuxtLink>
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <div class="mb-2 flex items-center justify-between">
+              <h2 class="text-sm font-semibold text-ink-muted">Recent sales</h2>
+              <NuxtLink to="/sales" class="focus-ring rounded text-xs font-semibold text-brand-600">View all</NuxtLink>
+            </div>
+            <ul v-if="data.recentSales?.length" class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
+              <li v-for="sale in data.recentSales" :key="sale.id" class="flex items-center justify-between px-4 py-3 text-sm">
+                <span class="text-ink-subtle">{{ formatTimeLabel(sale.soldAt) }}</span>
+                <span class="font-semibold tabular-nums text-ink">{{ formatPeso(sale.revenue) }}</span>
+              </li>
+            </ul>
+            <AppEmpty v-else message="No sales recorded yet today." />
+          </section>
+        </div>
       </template>
     </div>
   </div>

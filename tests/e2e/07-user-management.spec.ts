@@ -307,7 +307,7 @@ test.describe('member: onboarding and permissions', () => {
     await page.getByTestId('confirm-password').fill(newPassword)
     await page.getByTestId('submit-password').click()
     await expect(page).toHaveURL('/')
-    await expect(page.getByText("Today's Summary")).toBeVisible()
+    await expect(page.getByText('Today', { exact: true })).toBeVisible()
     if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'after-forced-password-change.png'), fullPage: true })
 
     // Members keep full store access…

@@ -14,14 +14,16 @@ test('warm navigation reuses the hydrated session and renders Home while its dat
   const dashboardHeld = new Promise<void>((resolve) => { releaseDashboard = resolve })
   await page.route('**/api/dashboard/today', async (route) => {
     await dashboardHeld
+    // Amounts are centavos end-to-end (see formatPeso in app/utils/format.ts) -
+    // 12500 centavos renders as ₱125.00, not 125.
     await route.fulfill({
       contentType: 'application/json',
-      body: JSON.stringify({ date: '2026-09-10', revenue: 125, cost: 50, profit: 75, itemsSold: 2, transactions: 1, lowStock: [] }),
+      body: JSON.stringify({ date: '2026-09-10', revenue: 12500, cost: 5000, profit: 7500, itemsSold: 2, transactions: 1, lowStock: [] }),
     })
   })
 
-  await page.getByRole('link', { name: 'Home' }).click()
-  await expect(page.getByRole('heading', { name: "Today's Summary" })).toBeVisible()
+  await page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Home' }).click()
+  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible()
   await expect(page.locator('.skeleton').first()).toBeVisible()
   expect(sessionRequests).toBe(beforeNavigation)
 
@@ -47,9 +49,13 @@ test('inventory ignores an older filter response that finishes after the latest 
   await expect.poll(() => requests).toBe(1)
   await page.getByPlaceholder('Search inventory...').fill('latest')
   await expect.poll(() => requests).toBe(2)
-  await expect(page.getByText('Latest result')).toBeVisible()
+  // Scoped to the mobile row list - the same product also renders in the
+  // desktop table (hidden at this viewport via CSS, but still present in the
+  // DOM), and getByText matches DOM text regardless of visibility.
+  const mobileRows = page.locator('ul')
+  await expect(mobileRows.getByText('Latest result')).toBeVisible()
 
   releaseOld()
   await expect(page.getByText('Old result')).toHaveCount(0)
-  await expect(page.getByText('Latest result')).toBeVisible()
+  await expect(mobileRows.getByText('Latest result')).toBeVisible()
 })

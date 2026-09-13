@@ -74,6 +74,12 @@ export interface SaleReceipt {
   lines: SaleReceiptLine[]
 }
 
+export interface RecentSale {
+  id: number
+  revenue: number
+  soldAt: string
+}
+
 export interface DashboardSummary {
   date: string
   revenue: number
@@ -82,6 +88,7 @@ export interface DashboardSummary {
   itemsSold: number
   transactions: number
   lowStock: Product[]
+  recentSales: RecentSale[]
 }
 
 export interface SalesTotals {
@@ -92,22 +99,30 @@ export interface SalesTotals {
   transactions: number
 }
 
+export interface DailySalesPoint {
+  date: string
+  revenue: number
+}
+
 export interface TopProduct {
   productId: number
   name: string
   variant: string
   quantitySold: number
+  revenue: number
 }
 
 export interface WeeklyReport extends SalesTotals {
   start: string
   end: string
+  series: DailySalesPoint[]
   topProducts: TopProduct[]
 }
 
 export interface MonthlyReport extends SalesTotals {
   start: string
   end: string
+  series: DailySalesPoint[]
   topProducts: TopProduct[]
   lowestStock: Product[]
 }

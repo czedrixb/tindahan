@@ -14,11 +14,11 @@ test('a named account is shown on actions in the audit log, which is scoped to s
 
   await page.context().clearCookies()
   await page.goto('/login')
-  await expect(page.getByText('Sign in to your account')).toBeVisible()
+  await expect(page.getByText('Your store, ready for the day.')).toBeVisible()
   if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'after-account-login.png'), fullPage: true })
 
   await page.getByLabel('Username').fill(username)
-  await page.getByLabel('Password').fill(password)
+  await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Sign In' }).click()
 
   // Admin-created accounts carry a temporary password and are forced through

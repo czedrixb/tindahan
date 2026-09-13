@@ -39,15 +39,19 @@ async function submit() {
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col justify-center bg-brand-700 px-6 text-white">
-    <div class="mx-auto w-full max-w-sm">
-      <div class="mb-8 text-center">
-        <BrandMark :size="64" class="mx-auto mb-3" />
-        <h1 class="text-2xl font-bold">Tindahan</h1>
-        <p class="mt-1 text-brand-100">Sign in to your account</p>
+  <div class="flex min-h-screen flex-col justify-start bg-canvas px-6 pt-16 lg:justify-center lg:pt-0">
+    <div class="mx-auto w-full max-w-[380px]">
+      <div class="mb-10 flex items-center gap-3">
+        <BrandMark :size="40" />
+        <span class="text-lg font-bold tracking-tight text-ink">Tindahan</span>
       </div>
 
-      <form class="space-y-4 rounded-[var(--radius-card)] bg-surface p-5 text-ink shadow-[var(--shadow-raised)]" @submit.prevent="submit">
+      <form class="space-y-5" @submit.prevent="submit">
+        <div>
+          <h1 class="text-2xl font-bold text-ink">Sign in</h1>
+          <p class="mt-1 text-sm text-ink-subtle">Your store, ready for the day.</p>
+        </div>
+
         <AppField label="Username" for="username">
           <input
             id="username"
@@ -60,21 +64,16 @@ async function submit() {
           />
         </AppField>
         <AppField label="Password" for="password">
-          <input
-            id="password"
-            v-model="password"
-            name="password"
-            type="password"
-            autocomplete="current-password"
-            class="field-input"
-          />
+          <PasswordField id="password" v-model="password" testid="login-password" autocomplete="current-password" />
         </AppField>
 
         <p v-if="error" class="rounded-lg bg-danger-50 px-3 py-2 text-sm font-medium text-danger-600">{{ error }}</p>
 
         <AppButton type="submit" block size="lg" :loading="loading" :disabled="!username.trim() || !password">
-          {{ loading ? 'Signing in' : 'Sign In' }}
+          {{ loading ? 'Signing in' : 'Sign in' }}
         </AppButton>
+
+        <p class="text-center text-sm text-ink-subtle">Need access? Ask your store admin.</p>
       </form>
     </div>
   </div>

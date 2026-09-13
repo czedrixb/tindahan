@@ -55,7 +55,7 @@ const countedItems = computed(() => count.value?.items.filter((i) => i.actualQua
   <div v-if="count">
     <PageHeader title="Inventory Count" :subtitle="formatDateLabel(count.countDate)" />
 
-    <div class="space-y-4 px-4 py-4">
+    <div class="page-shell space-y-4">
       <div class="flex items-center justify-between rounded-[var(--radius-control)] bg-surface-sunken px-4 py-3 text-sm">
         <span class="text-ink-muted">{{ countedItems }} / {{ count.items.length }} counted</span>
         <AppBadge :tone="count.status === 'COMPLETED' ? 'neutral' : 'brand'">

@@ -11,4 +11,8 @@ useHead({
     <NuxtPage />
   </NuxtLayout>
   <AppSplash />
+  <!-- @vite-pwa/nuxt only auto-registers this component; it never renders it
+       for you. Without it the manifest is generated and servable but never
+       linked from the document head, so the app is never installable. -->
+  <VitePwaManifest />
 </template>

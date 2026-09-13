@@ -43,7 +43,7 @@ async function save(product: Product) {
   <div>
     <PageHeader title="Needs Pricing" :subtitle="`${products.length} product${products.length === 1 ? '' : 's'}`" />
 
-    <div class="px-4 py-4">
+    <div class="page-shell page-shell--form">
       <AppEmpty v-if="!products.length" :icon="PhTag" message="All products are priced." />
 
       <ul v-else class="space-y-3">

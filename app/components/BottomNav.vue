@@ -18,12 +18,32 @@ const tabs: Tab[] = [
 ]
 
 const route = useRoute()
+
+// layouts/default.vue unmounts this component while a text field is focused
+// (so its fixed hit-test area can't eat a tap meant for content underneath -
+// see that file's comment) and remounts it shortly after focus leaves. A tap
+// that lands near the screen bottom right as focus leaves (e.g. Complete
+// sale under a tall cart) can still be mid-gesture - mousedown already blurred
+// the field, but mouseup/click hasn't dispatched yet - when this remounts;
+// browsers re-hit-test the click at dispatch time, so a nav that reappears in
+// between can steal it even though the tap started on the real target.
+// Withholding pointer events for a brief window after mount lets any
+// in-flight gesture land on whatever is actually underneath instead.
+const justMounted = ref(true)
+let justMountedTimer: ReturnType<typeof setTimeout> | undefined
+onMounted(() => {
+  justMountedTimer = setTimeout(() => { justMounted.value = false }, 250)
+})
+onBeforeUnmount(() => clearTimeout(justMountedTimer))
 </script>
 
 <template>
-  <div class="safe-bottom fixed inset-x-0 bottom-0 z-50 isolate mx-auto max-w-md px-4 [--safe-pb:0.75rem]">
+  <div
+    class="safe-bottom fixed inset-x-0 bottom-0 z-50 isolate mx-auto max-w-md px-4 [--safe-pb:0.75rem] lg:hidden"
+    :class="justMounted ? 'pointer-events-none' : ''"
+  >
     <nav
-      class="flex rounded-[28px] border border-line/60 bg-surface/95 backdrop-blur"
+      class="flex rounded-[var(--radius-card)] border border-line bg-surface"
       style="box-shadow: var(--shadow-nav)"
       aria-label="Primary"
     >

@@ -36,7 +36,7 @@ async function startCount() {
   <div>
     <PageHeader title="Inventory Count" />
 
-    <div class="space-y-4 px-4 py-4">
+    <div class="page-shell page-shell--form space-y-4">
       <AppButton block :loading="starting" @click="startCount">
         {{ starting ? 'Starting' : '+ Start New Count' }}
       </AppButton>

@@ -46,8 +46,8 @@ export default defineNuxtConfig({
       name: 'Tindahan',
       short_name: 'Tindahan',
       description: 'Inventory, sales, and profit tracking for your sari-sari store',
-      theme_color: '#6d5de0',
-      background_color: '#faf8f3',
+      theme_color: '#345b46',
+      background_color: '#faf9f6',
       display: 'standalone',
       start_url: '/',
       icons: [
@@ -75,7 +75,7 @@ export default defineNuxtConfig({
       // serializable app.head type doesn't accept - set at runtime instead,
       // in app/app.vue, right where the splash is also wired up.
       viewport: 'width=device-width, initial-scale=1, viewport-fit=cover',
-      meta: [{ name: 'theme-color', content: '#6d5de0' }],
+      meta: [{ name: 'theme-color', content: '#345b46' }],
       link: [
         { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/icons/storefront-16.png' },
         { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/icons/storefront-32.png' },

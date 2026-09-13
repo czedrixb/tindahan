@@ -1,56 +1,35 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Periwinkle brand. Locked to nuxt.config.ts theme_color / PWA manifest -
-     do not change #6D5DE0 without updating both. */
-  --color-brand-50: #f5f3fe;
-  --color-brand-100: #eae6fd;
-  --color-brand-200: #d8d1fa;
-  --color-brand-300: #bfb4f5;
-  --color-brand-400: #a294ef;
-  --color-brand-500: #8878e9;
-  --color-brand-600: #6d5de0; /* 4.9:1 on white */
-  --color-brand-700: #5b49cc; /* 6.4:1 on white */
-  --color-brand-800: #4a3aa6;
-  --color-brand-900: #332874;
+  /* Muted forest-green brand, per the 2026-09-13 POS redesign. Locked to
+     nuxt.config.ts theme_color / PWA manifest - do not change #345B46
+     without updating both (see docs/2026-09-13-pos-redesign.md). */
+  --color-brand-50: #f1f5f2;
+  --color-brand-100: #dde8e1;
+  --color-brand-200: #bfd2c6;
+  --color-brand-300: #97b4a2;
+  --color-brand-400: #6b8f7a;
+  --color-brand-500: #4a7159;
+  --color-brand-600: #345b46; /* ~8:1 on white */
+  --color-brand-700: #2a4a39;
+  --color-brand-800: #1f3729;
+  --color-brand-900: #16271d;
 
-  /* Coral secondary. Pairs with brand for two-series emphasis (e.g. chart
-     bars); used sparingly against the periwinkle-dominant surfaces. */
-  --color-accent-50: #fef3f2;
-  --color-accent-100: #fde4e2;
-  --color-accent-200: #fbcbc7;
-  --color-accent-300: #f7aba5;
-  --color-accent-400: #f0908a;
-  --color-accent-500: #e8736c;
-  --color-accent-600: #c74940; /* 4.7:1 on white */
-  --color-accent-700: #a63a32;
-
-  /* Teal/mint tertiary. Reserved for positive totals (profit) and the
-     "View inventory" quick action, so a third hue is available alongside
-     brand + coral instead of reusing --color-success-* for a non-status role. */
-  --color-teal-50: #eefaf6;
-  --color-teal-100: #d2f1e7;
-  --color-teal-200: #a6e3d1;
-  --color-teal-300: #71cdb7;
-  --color-teal-400: #3fb29a;
-  --color-teal-500: #1f9781;
-  --color-teal-600: #0d8a76; /* 4.6:1 on white */
-  --color-teal-700: #0f766e; /* 5.9:1 on white */
-
-  /* One neutral temperature (violet-tinted, matching the brand) used for
-     every surface, border, and ink in the app - replaces the mix of a
-     green-tinted body background against cool Tailwind gray-* utilities. */
+  /* Warm-gray neutral temperature (matching the warm-white canvas) used for
+     every surface, border, and ink in the app. Restrained direction: one
+     neutral family plus the brand green and the status colors below, rather
+     than the earlier accent/teal thirds-hue system used for metric tiles. */
   --color-neutral-0: #ffffff;
-  --color-neutral-50: #f6f4fb;
-  --color-neutral-100: #efecf7;
-  --color-neutral-200: #e3dfee;
-  --color-neutral-300: #cbc5dc;
-  --color-neutral-400: #a29bb5;
-  --color-neutral-500: #7a7390;
-  --color-neutral-600: #5d5772;
-  --color-neutral-700: #454156;
-  --color-neutral-800: #2e2b3a;
-  --color-neutral-900: #1b1927;
+  --color-neutral-50: #f7f6f3;
+  --color-neutral-100: #f0eee9;
+  --color-neutral-200: #e4e1da;
+  --color-neutral-300: #cfcbc1;
+  --color-neutral-400: #a8a399;
+  --color-neutral-500: #7d7871;
+  --color-neutral-600: #5c5852;
+  --color-neutral-700: #45423d;
+  --color-neutral-800: #33302c;
+  --color-neutral-900: #242923;
 
   /* Semantic surface / ink aliases so pages stop hardcoding ramp steps. */
   --color-surface: var(--color-neutral-0);
@@ -91,24 +70,25 @@
   --color-info-600: #475569;
   --color-info-700: #334155;
 
-  /* Warm ivory canvas. Locked to nuxt.config.ts PWA background_color - do
+  /* Warm-white canvas. Locked to nuxt.config.ts PWA background_color - do
      not change without updating both. */
-  --color-canvas: #faf8f3;
-  --color-canvas-tint: #f5f2fb;
+  --color-canvas: #faf9f6;
 
-  /* Shape Consistency Lock: one radius scale, used everywhere. */
-  --radius-control: 14px;
-  --radius-chip: 16px;
-  --radius-card: 24px;
+  /* Restrained radius scale - controls read as functional, not pill-shaped.
+     Shape Consistency Lock: one radius scale, used everywhere. */
+  --radius-control: 8px;
+  --radius-chip: 8px;
+  --radius-card: 12px;
   --radius-pill: 9999px;
 
-  /* Elevation, tinted to the neutral hue instead of pure black. Softer and
-     more diffuse than the old green theme, to match the reference's
-     near-flat white-on-lavender cards. */
-  --shadow-card: 0 1px 2px 0 rgb(27 25 39 / 0.03), 0 8px 24px -12px rgb(27 25 39 / 0.08);
-  --shadow-raised: 0 4px 16px -4px rgb(27 25 39 / 0.10), 0 2px 6px -2px rgb(27 25 39 / 0.05);
-  --shadow-sheet: 0 -8px 30px -4px rgb(27 25 39 / 0.18);
-  --shadow-nav: 0 8px 32px -8px rgb(27 25 39 / 0.18), 0 2px 8px -2px rgb(27 25 39 / 0.08);
+  /* Flat by default - the redesign avoids decorative elevation. Cards carry
+     a hairline border (--color-line) instead of --shadow-card. The raised /
+     sheet / nav shadows remain, restrained, for surfaces that genuinely
+     float above the page (dialogs, the mobile bottom nav). */
+  --shadow-card: none;
+  --shadow-raised: 0 4px 16px -4px rgb(36 41 35 / 0.10), 0 2px 6px -2px rgb(36 41 35 / 0.05);
+  --shadow-sheet: 0 -8px 30px -4px rgb(36 41 35 / 0.16);
+  --shadow-nav: 0 8px 24px -8px rgb(36 41 35 / 0.14), 0 2px 8px -2px rgb(36 41 35 / 0.06);
 
   /* Motion tokens. */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -164,11 +144,26 @@ body,
 
 body {
   font-family: var(--font-sans);
+  /* Flat warm-white canvas - the redesign rules out decorative gradients. */
   background-color: var(--color-canvas);
-  background-image: linear-gradient(180deg, var(--color-canvas-tint) 0%, var(--color-canvas) 100%);
-  background-attachment: fixed;
   color: var(--color-ink);
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Desktop workspace container. Mobile keeps the phone-width column (set
+   inline by layouts/default.vue); above the lg breakpoint the sidebar layout
+   takes over and pages get real width plus a comfortable, non-full-bleed
+   form column where noted. */
+.page-shell {
+  padding: 1rem;
+}
+@media (min-width: 1024px) {
+  .page-shell {
+    padding: 1.5rem 2rem;
+  }
+}
+.page-shell--form {
+  max-width: 44rem;
 }
 
 .tabular-nums {

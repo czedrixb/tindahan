@@ -81,7 +81,7 @@ async function logout() {
   <div>
     <PageHeader title="More" />
 
-    <div class="space-y-6 px-4 py-4">
+    <div class="page-shell page-shell--form space-y-6">
       <section class="space-y-2">
         <h2 class="text-sm font-semibold text-ink-muted">Account</h2>
         <AppCard>

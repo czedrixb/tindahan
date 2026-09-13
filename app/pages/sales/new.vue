@@ -11,6 +11,12 @@ const { lines: cart, cash: cashInput, submissionKey, clear: clearCartState } = u
 
 const search = ref('')
 const results = ref<Product[]>([])
+// Browse list shown while the search box is idle, so the left column always
+// has something to sell from rather than a bare hint (docs/2026-09-13-pos-redesign.md
+// "New sale" spec). Kept in a separate testid/array from `results` so tests
+// asserting on actual search matches (data-testid="search-result") are
+// unaffected by what this list contains.
+const frequentProducts = ref<Product[]>([])
 const saving = ref(false)
 const voiding = ref(false)
 const errorMessage = ref('')
@@ -49,6 +55,15 @@ watch(search, () => {
   // search is still in flight.
   results.value = []
   requestLoad()
+})
+
+onMounted(async () => {
+  try {
+    frequentProducts.value = await $fetch<Product[]>('/api/products/frequent', { query: { limit: 12 } })
+  } catch {
+    // Non-essential: the idle state just falls back to the plain hint below.
+    frequentProducts.value = []
+  }
 })
 
 function addToCart(product: Product) {
@@ -219,9 +234,9 @@ onBeforeRouteLeave(async (to) => {
 
 <template>
   <div>
-    <PageHeader title="Checkout" />
+    <PageHeader title="New sale" />
 
-    <div class="space-y-4 px-4 py-4">
+    <div class="page-shell space-y-4">
       <div
         v-if="errorMessage"
         class="rounded-[var(--radius-control)] bg-danger-50 px-4 py-3 text-center text-sm font-semibold text-danger-600"
@@ -231,7 +246,7 @@ onBeforeRouteLeave(async (to) => {
       </div>
 
       <template v-if="completedSale">
-        <AppCard data-testid="sale-summary">
+        <AppCard data-testid="sale-summary" class="mx-auto lg:max-w-xl">
           <p
             class="mb-3 rounded-lg px-3 py-2 text-center text-sm font-semibold"
             :class="completedSale.voidedAt ? 'bg-neutral-100 text-ink-subtle' : 'bg-success-50 text-success-700'"
@@ -254,22 +269,21 @@ onBeforeRouteLeave(async (to) => {
             </li>
           </ul>
 
-          <div class="mt-4 grid grid-cols-2 gap-3 text-center">
-            <div class="rounded-[var(--radius-control)] bg-surface-sunken py-3">
-              <p class="text-xs uppercase text-ink-subtle">Total</p>
-              <p class="text-xl font-bold tabular-nums">{{ formatPeso(completedSale.revenue) }}</p>
+          <div class="mt-4 space-y-2 border-t border-line pt-3">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-ink-subtle">Total</span>
+              <span class="font-semibold tabular-nums text-ink">{{ formatPeso(completedSale.revenue) }}</span>
             </div>
-            <div class="rounded-[var(--radius-control)] bg-surface-sunken py-3">
-              <p class="text-xs uppercase text-ink-subtle">Cash received</p>
-              <p class="text-xl font-bold tabular-nums">{{ formatPeso(completedSale.cashReceived ?? 0) }}</p>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-ink-subtle">Cash received</span>
+              <span class="font-semibold tabular-nums text-ink">{{ formatPeso(completedSale.cashReceived ?? 0) }}</span>
             </div>
-          </div>
-
-          <div class="pop-in mt-3 rounded-[var(--radius-control)] bg-success-50 py-3 text-center">
-            <p class="text-xs uppercase text-success-700">Change due</p>
-            <p class="text-2xl font-bold tabular-nums text-success-700" data-testid="summary-change">
-              {{ formatPeso(completedSale.changeDue ?? 0) }}
-            </p>
+            <div class="flex items-center justify-between border-t border-line pt-2 text-sm">
+              <span class="font-semibold text-ink">Change due</span>
+              <span class="pop-in text-xl font-bold tabular-nums text-ink" data-testid="summary-change">
+                {{ formatPeso(completedSale.changeDue ?? 0) }}
+              </span>
+            </div>
           </div>
 
           <AppButton
@@ -291,141 +305,186 @@ onBeforeRouteLeave(async (to) => {
       </template>
 
       <template v-else>
-        <div class="sticky-search -mx-4 border-b border-line bg-surface-sunken px-4 pt-3 pb-3">
-          <div class="relative">
-          <PhMagnifyingGlass class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
-          <input
-            ref="searchInput"
-            v-model="search"
-            type="search"
-            placeholder="Search product..."
-            class="field-input field-input--with-leading-icon"
-            data-testid="product-search"
-          />
+        <div class="lg:grid lg:grid-cols-[1fr_22rem] lg:items-start lg:gap-8">
+          <div class="space-y-4">
+            <div class="sticky-search -mx-4 border-b border-line bg-surface-sunken px-4 pt-3 pb-3 lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:pt-0 lg:pb-0">
+              <div class="relative">
+                <PhMagnifyingGlass class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-subtle" />
+                <input
+                  ref="searchInput"
+                  v-model="search"
+                  type="search"
+                  placeholder="Search product..."
+                  class="field-input field-input--with-leading-icon"
+                  data-testid="product-search"
+                />
+              </div>
+            </div>
+
+            <ul v-if="results.length" class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
+              <li v-for="(p, i) in results" :key="p.id" class="list-enter-item" :style="{ '--i': i }">
+                <button
+                  type="button"
+                  class="relative z-10 flex w-full touch-manipulation items-center justify-between px-4 py-3 text-left active:bg-neutral-50"
+                  data-testid="search-result"
+                  @click="addToCart(p)"
+                  @touchend.prevent="addToCart(p)"
+                >
+                  <span>
+                    <span class="font-medium text-ink">{{ p.name }}</span>
+                    <span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span>
+                  </span>
+                  <span class="flex items-center gap-3 text-xs text-ink-subtle">
+                    {{ formatPeso(p.sellingPrice ?? 0) }} · {{ p.stock }} in stock
+                    <PhPlus class="h-4 w-4 text-brand-600" weight="bold" aria-hidden="true" />
+                  </span>
+                </button>
+              </li>
+            </ul>
+            <p v-else-if="search.trim()" class="py-6 text-center text-sm text-ink-subtle">No matching products.</p>
+
+            <!-- Once a sale is in progress, don't stack a long browse list
+                 above the Current sale panel on mobile - it pushed the total
+                 and Complete sale action off-screen (see the viewport check
+                 in tests/e2e/16-checkout-cart-and-headers.spec.ts). Idle
+                 browsing is only offered before the first item is added. -->
+            <p v-else-if="cart.length" class="py-6 text-center text-sm text-ink-subtle">Search for another product to add it.</p>
+
+            <template v-else>
+              <template v-if="frequentProducts.length">
+                <h2 class="text-sm font-semibold text-ink-muted">Frequently sold</h2>
+                <ul class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
+                  <li v-for="(p, i) in frequentProducts" :key="p.id" class="list-enter-item" :style="{ '--i': i }">
+                    <button
+                      type="button"
+                      class="relative z-10 flex w-full touch-manipulation items-center justify-between px-4 py-3 text-left active:bg-neutral-50"
+                      data-testid="frequent-product"
+                      @click="addToCart(p)"
+                      @touchend.prevent="addToCart(p)"
+                    >
+                      <span>
+                        <span class="font-medium text-ink">{{ p.name }}</span>
+                        <span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span>
+                      </span>
+                      <span class="flex items-center gap-3 text-xs text-ink-subtle">
+                        {{ formatPeso(p.sellingPrice ?? 0) }} · {{ p.stock }} in stock
+                        <PhPlus class="h-4 w-4 text-brand-600" weight="bold" aria-hidden="true" />
+                      </span>
+                    </button>
+                  </li>
+                </ul>
+              </template>
+              <p v-else class="py-6 text-center text-sm text-ink-subtle">Search for a product to add it to the cart.</p>
+            </template>
+          </div>
+
+          <div v-if="cart.length" class="mt-4 lg:mt-0 lg:sticky lg:top-24">
+            <AppCard>
+              <div class="flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-ink-muted">Current sale</h2>
+                <button type="button" class="focus-ring rounded text-xs font-semibold text-brand-600" @click="clearCart">Clear</button>
+              </div>
+
+              <div
+                v-for="(line, i) in cart"
+                :key="line.product.id"
+                class="list-enter-item mt-3 border-b border-line pb-3 last:border-0 last:pb-0"
+                :style="{ '--i': i }"
+                data-testid="cart-line"
+              >
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="font-semibold text-ink">
+                      {{ line.product.name
+                      }}<span v-if="line.product.variant" class="font-normal text-ink-subtle"> · {{ line.product.variant }}</span>
+                    </p>
+                    <p class="text-xs text-ink-subtle">{{ formatPeso(line.product.sellingPrice ?? 0) }} each · {{ line.product.stock }} in stock</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="focus-ring flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-danger-600 active:bg-danger-50"
+                    data-testid="cart-line-remove"
+                    @click="removeLine(i)"
+                  >
+                    <PhX class="h-3.5 w-3.5" weight="bold" />
+                    Remove
+                  </button>
+                </div>
+
+                <div class="mt-2 flex items-center gap-4">
+                  <button
+                    type="button"
+                    class="press focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-ink-muted active:bg-neutral-200"
+                    data-testid="qty-decrement"
+                    @click="decLine(line)"
+                  >
+                    <PhMinus class="h-4 w-4" weight="bold" />
+                  </button>
+                  <input
+                    v-model.number="line.quantity"
+                    type="number"
+                    inputmode="numeric"
+                    min="1"
+                    :max="line.product.stock"
+                    class="field-input w-14 px-1 py-1.5 text-center text-xl font-bold tabular-nums"
+                    data-testid="qty-input"
+                    @blur="clampLineQuantity(line)"
+                  />
+                  <button
+                    type="button"
+                    class="press focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-ink-muted active:bg-neutral-200"
+                    data-testid="qty-increment"
+                    @click="incLine(line)"
+                  >
+                    <PhPlus class="h-4 w-4" weight="bold" />
+                  </button>
+                  <span class="ml-auto font-semibold tabular-nums text-ink">
+                    {{ formatPeso((line.product.sellingPrice ?? 0) * line.quantity) }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="mt-3 flex items-center justify-between border-t border-line pt-3">
+                <span class="text-sm text-ink-subtle">Total</span>
+                <span class="text-xl font-bold tabular-nums text-ink" data-testid="sale-total">{{ formatPeso(total) }}</span>
+              </div>
+
+              <AppField label="Cash received" for="cash-received" class="mt-4">
+                <input
+                  id="cash-received"
+                  v-model="cashInput"
+                  type="text"
+                  inputmode="decimal"
+                  placeholder="0.00"
+                  class="field-input text-lg tabular-nums"
+                  data-testid="cash-received"
+                />
+              </AppField>
+
+              <div v-if="cashInput.trim()" class="mt-3 flex items-center justify-between border-t border-line pt-3">
+                <template v-if="!cashValid">
+                  <p class="text-sm font-medium text-danger-600">Enter a valid amount.</p>
+                </template>
+                <template v-else-if="hasShortfall">
+                  <span class="text-sm text-danger-600">Still needed</span>
+                  <span class="text-xl font-bold tabular-nums text-danger-600" data-testid="cash-shortfall">
+                    {{ formatPeso(Math.abs(changeDue ?? 0)) }}
+                  </span>
+                </template>
+                <template v-else>
+                  <span class="text-sm text-ink-subtle">Change</span>
+                  <span class="text-xl font-bold tabular-nums text-ink" data-testid="change-due">
+                    {{ formatPeso(changeDue ?? 0) }}
+                  </span>
+                </template>
+              </div>
+
+              <AppButton block class="mt-5" :loading="saving" :disabled="!canComplete" data-testid="save-sale" @click="saveSale">
+                {{ saving ? 'Saving' : 'Complete sale' }}
+              </AppButton>
+            </AppCard>
           </div>
         </div>
-
-        <ul v-if="results.length" class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-          <li v-for="(p, i) in results" :key="p.id" class="list-enter-item" :style="{ '--i': i }">
-            <button
-              type="button"
-              class="relative z-10 flex w-full touch-manipulation items-center justify-between px-4 py-3 text-left active:bg-neutral-50"
-              data-testid="search-result"
-              @click="addToCart(p)"
-              @touchend.prevent="addToCart(p)"
-            >
-              <span>
-                <span class="font-medium text-ink">{{ p.name }}</span>
-                <span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span>
-              </span>
-              <span class="text-xs text-ink-subtle">{{ p.stock }} in stock</span>
-            </button>
-          </li>
-        </ul>
-        <p v-else-if="search.trim()" class="py-6 text-center text-sm text-ink-subtle">No matching products.</p>
-
-        <AppCard v-if="cart.length">
-          <div
-            v-for="(line, i) in cart"
-            :key="line.product.id"
-            class="list-enter-item border-b border-line pb-3 last:border-0 last:pb-0"
-            :class="{ 'mb-3': i < cart.length - 1 }"
-            :style="{ '--i': i }"
-            data-testid="cart-line"
-          >
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="font-semibold text-ink">
-                  {{ line.product.name
-                  }}<span v-if="line.product.variant" class="font-normal text-ink-subtle"> · {{ line.product.variant }}</span>
-                </p>
-                <p class="text-xs text-ink-subtle">{{ formatPeso(line.product.sellingPrice ?? 0) }} each · {{ line.product.stock }} in stock</p>
-              </div>
-              <button
-                type="button"
-                class="focus-ring flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-danger-600 active:bg-danger-50"
-                data-testid="cart-line-remove"
-                @click="removeLine(i)"
-              >
-                <PhX class="h-3.5 w-3.5" weight="bold" />
-                Remove
-              </button>
-            </div>
-
-            <div class="mt-2 flex items-center gap-4">
-              <button
-                type="button"
-                class="press focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-ink-muted active:bg-neutral-200"
-                data-testid="qty-decrement"
-                @click="decLine(line)"
-              >
-                <PhMinus class="h-4 w-4" weight="bold" />
-              </button>
-              <input
-                v-model.number="line.quantity"
-                type="number"
-                inputmode="numeric"
-                min="1"
-                :max="line.product.stock"
-                class="field-input w-14 px-1 py-1.5 text-center text-xl font-bold tabular-nums"
-                data-testid="qty-input"
-                @blur="clampLineQuantity(line)"
-              />
-              <button
-                type="button"
-                class="press focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-neutral-100 text-ink-muted active:bg-neutral-200"
-                data-testid="qty-increment"
-                @click="incLine(line)"
-              >
-                <PhPlus class="h-4 w-4" weight="bold" />
-              </button>
-              <span class="ml-auto font-semibold tabular-nums text-ink">
-                {{ formatPeso((line.product.sellingPrice ?? 0) * line.quantity) }}
-              </span>
-            </div>
-          </div>
-
-          <div class="mt-4 rounded-[var(--radius-control)] bg-surface-sunken py-3 text-center">
-            <p class="text-xs uppercase text-ink-subtle">Total</p>
-            <p class="text-xl font-bold tabular-nums" data-testid="sale-total">{{ formatPeso(total) }}</p>
-          </div>
-
-          <AppField label="Cash received" for="cash-received" class="mt-4">
-            <input
-              id="cash-received"
-              v-model="cashInput"
-              type="text"
-              inputmode="decimal"
-              placeholder="0.00"
-              class="field-input text-lg tabular-nums"
-              data-testid="cash-received"
-            />
-          </AppField>
-
-          <div v-if="cashInput.trim()" class="mt-3 rounded-[var(--radius-control)] py-3 text-center" :class="hasShortfall ? 'bg-danger-50' : 'bg-success-50'">
-            <template v-if="!cashValid">
-              <p class="text-sm font-medium text-danger-600">Enter a valid amount.</p>
-            </template>
-            <template v-else-if="hasShortfall">
-              <p class="text-xs uppercase text-danger-600">Still needed</p>
-              <p class="text-xl font-bold tabular-nums text-danger-600" data-testid="cash-shortfall">
-                {{ formatPeso(Math.abs(changeDue ?? 0)) }}
-              </p>
-            </template>
-            <template v-else>
-              <p class="text-xs uppercase text-success-700">Change due</p>
-              <p class="text-xl font-bold tabular-nums text-success-700" data-testid="change-due">
-                {{ formatPeso(changeDue ?? 0) }}
-              </p>
-            </template>
-          </div>
-
-          <AppButton block class="mt-5" :loading="saving" :disabled="!canComplete" data-testid="save-sale" @click="saveSale">
-            {{ saving ? 'Saving' : 'Complete sale' }}
-          </AppButton>
-        </AppCard>
-
-        <p v-else-if="!search.trim()" class="py-6 text-center text-sm text-ink-subtle">Search for a product to add it to the cart.</p>
       </template>
     </div>
   </div>

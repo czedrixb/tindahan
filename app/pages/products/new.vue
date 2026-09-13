@@ -42,7 +42,7 @@ async function save() {
   <div>
     <PageHeader title="Add Product" />
 
-    <div class="space-y-3 px-4 py-4">
+    <div class="page-shell page-shell--form space-y-3">
       <p v-if="error" class="rounded-lg bg-danger-50 px-3 py-2 text-sm text-danger-600">{{ error }}</p>
 
       <AppField label="Product Name" for="product-name">

@@ -24,7 +24,7 @@ test('daily and weekly reports reflect recorded sales', async ({ page, request }
   expect(afterWeek.revenue - beforeWeek.revenue).toBe(2000)
 
   await page.goto('/reports')
-  await expect(page.getByText('Total Revenue')).toBeVisible()
+  await expect(page.getByText('Sales', { exact: true })).toBeVisible()
   await expect(page.getByText(formatPeso(after.profit))).toBeVisible()
 })
 
@@ -42,7 +42,7 @@ test('inventory and sales can be exported to Excel', async ({ page }) => {
   await page.goto('/reports')
   const [salesDownload] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByText('Export Daily Sales').click(),
+    page.getByRole('link', { name: 'Export' }).click(),
   ])
   expect(salesDownload.suggestedFilename()).toMatch(/^sales-.*\.xlsx$/)
   const salesPath = await salesDownload.path()

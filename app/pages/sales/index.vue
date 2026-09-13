@@ -104,7 +104,7 @@ async function voidReceipt(receipt: Receipt) {
   <div>
     <PageHeader title="Sales History" />
 
-    <div class="px-4 py-4">
+    <div class="page-shell">
       <div class="flex gap-2 overflow-x-auto pb-1">
         <button
           v-for="f in filters"
@@ -118,9 +118,9 @@ async function voidReceipt(receipt: Receipt) {
         </button>
       </div>
 
-      <div class="mt-4 grid grid-cols-2 gap-3">
-        <StatTile label="Revenue" :value="formatPeso(totalRevenue)" tone="brand" />
-        <StatTile label="Profit" :value="formatPeso(totalProfit)" tone="brand" />
+      <div class="mt-4 flex gap-8">
+        <StatTile label="Revenue" :value="formatPeso(totalRevenue)" />
+        <StatTile label="Profit" :value="formatPeso(totalProfit)" />
       </div>
 
       <AppSkeleton v-if="loading" variant="list" class="mt-4" />

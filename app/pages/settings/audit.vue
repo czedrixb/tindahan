@@ -24,7 +24,7 @@ function formatTime(value: string) {
 <template>
   <div>
     <PageHeader title="Audit Log" subtitle="Who did what, and when" />
-    <div class="px-4 py-4">
+    <div class="page-shell page-shell--form">
       <AppSkeleton v-if="status === 'pending'" variant="list" />
       <AppEmpty v-else-if="!entries?.length" :icon="PhClockCounterClockwise" message="No activity recorded yet." />
       <ol v-else class="space-y-3" data-testid="audit-log">

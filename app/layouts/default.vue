@@ -19,24 +19,35 @@ function isTextField(el: Element | null): boolean {
 function syncFocusState() {
   textInputFocused.value = isTextField(document.activeElement)
 }
+let restoreNavTimer: ReturnType<typeof setTimeout> | undefined
 function onFocusOut() {
-  // The new activeElement isn't set until after this event, so re-check on
-  // the next frame instead of assuming focus left every text field entirely.
-  requestAnimationFrame(syncFocusState)
+  // The new activeElement isn't set until after this event, so re-check
+  // shortly after instead of assuming focus left every text field entirely.
+  // A same-frame requestAnimationFrame check used to run this, but a tap that
+  // blurs a text field by landing on a button *below* it (e.g. Complete sale
+  // under a tall cart) can still be mid-gesture (mousedown already blurred
+  // the field; mouseup/click hasn't dispatched yet) when that callback fires -
+  // remounting the nav right then can put it back over the pointer before the
+  // click lands, silently swallowing the tap. A short timeout outlasts that
+  // gesture instead of racing it.
+  clearTimeout(restoreNavTimer)
+  restoreNavTimer = setTimeout(syncFocusState, 150)
 }
 onMounted(() => {
   document.addEventListener('focusin', syncFocusState)
   document.addEventListener('focusout', onFocusOut)
 })
 onBeforeUnmount(() => {
+  clearTimeout(restoreNavTimer)
   document.removeEventListener('focusin', syncFocusState)
   document.removeEventListener('focusout', onFocusOut)
 })
 </script>
 
 <template>
-  <div class="mx-auto flex min-h-screen max-w-md flex-col bg-transparent">
-    <main class="relative z-0 flex-1" :class="showNav ? 'pb-28' : ''">
+  <div class="flex min-h-screen flex-col bg-transparent" :class="showNav ? 'lg:grid lg:grid-cols-[15rem_1fr] lg:items-stretch' : ''">
+    <AppSidebar v-if="showNav" class="hidden lg:flex" />
+    <main class="relative z-0 mx-auto w-full max-w-md flex-1 lg:max-w-none" :class="showNav ? 'pb-28 lg:pb-0' : ''">
       <slot />
     </main>
     <BottomNav v-if="showNav && !textInputFocused" />

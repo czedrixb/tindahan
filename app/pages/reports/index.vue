@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { PhFileXls } from '@phosphor-icons/vue'
-import type { MonthlyReport, SalesTotals, WeeklyReport } from '~/types'
+import type { DailySalesPoint, MonthlyReport, SalesTotals, TopProduct, WeeklyReport } from '~/types'
 
 const toast = useToast()
 
@@ -26,105 +26,166 @@ async function load() {
 
 watch(tab, load)
 onMounted(load)
+
+const RANGE_PARAM = { daily: 'today', weekly: 'week', monthly: 'month' } as const
+const exportHref = computed(() => `/api/export/sales?range=${RANGE_PARAM[tab.value]}`)
+
+const rangeLabel = computed(() => {
+  if (tab.value === 'daily') return daily.value ? formatDateLabel(daily.value.date) : ''
+  if (tab.value === 'weekly') return weekly.value ? `${formatDateLabel(weekly.value.start)} – ${formatDateLabel(weekly.value.end)}` : ''
+  return monthly.value ? `${formatDateLabel(monthly.value.start)} – ${formatDateLabel(monthly.value.end)}` : ''
+})
+
+const totals = computed<SalesTotals | null>(() => {
+  if (tab.value === 'daily') return daily.value
+  if (tab.value === 'weekly') return weekly.value
+  return monthly.value
+})
+
+// Only weekly/monthly reports carry a per-day series and a product breakdown
+// with revenue - a single day has nothing to chart or rank (server/utils/sales-report.ts).
+const series = computed<DailySalesPoint[]>(() => {
+  if (tab.value === 'weekly') return weekly.value?.series ?? []
+  if (tab.value === 'monthly') return monthly.value?.series ?? []
+  return []
+})
+const topProducts = computed<TopProduct[]>(() => {
+  if (tab.value === 'weekly') return weekly.value?.topProducts ?? []
+  if (tab.value === 'monthly') return monthly.value?.topProducts ?? []
+  return []
+})
+const lowestStock = computed(() => monthly.value?.lowestStock ?? [])
+
+const CHART_W = 100
+const CHART_H = 36
+const chartMax = computed(() => Math.max(1, ...series.value.map((p) => p.revenue)))
+
+function barSlotWidth() {
+  return series.value.length ? CHART_W / series.value.length : 0
+}
+function barX(i: number) {
+  return i * barSlotWidth() + barSlotWidth() * 0.22
+}
+function barWidth() {
+  return barSlotWidth() * 0.56
+}
+function barHeight(revenue: number) {
+  return (revenue / chartMax.value) * CHART_H
+}
+function barY(revenue: number) {
+  return CHART_H - barHeight(revenue)
+}
+function dayLabel(dateKey: string) {
+  return new Date(`${dateKey}T00:00:00+08:00`).toLocaleDateString('en-PH', {
+    timeZone: 'Asia/Manila',
+    weekday: 'short',
+    day: 'numeric',
+  })
+}
 </script>
 
 <template>
   <div>
-    <PageHeader title="Reports" />
-
-    <div class="space-y-4 px-4 py-4">
-      <div class="flex gap-2">
-        <button
-          v-for="t in (['daily', 'weekly', 'monthly'] as const)"
-          :key="t"
-          type="button"
-          class="press focus-ring flex-1 rounded-[var(--radius-pill)] py-1.5 text-sm font-medium capitalize"
-          :class="tab === t ? 'bg-brand-600 text-white' : 'bg-neutral-100 text-ink-muted'"
-          @click="tab = t"
+    <PageHeader title="Reports">
+      <template #actions>
+        <a
+          :href="exportHref"
+          class="press focus-ring flex min-h-11 shrink-0 touch-manipulation items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 text-sm font-semibold text-ink active:bg-neutral-50"
         >
-          {{ t }}
-        </button>
+          <PhFileXls class="h-4 w-4" weight="bold" />
+          Export
+        </a>
+      </template>
+    </PageHeader>
+
+    <div class="page-shell space-y-4">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex gap-2">
+          <button
+            v-for="t in (['daily', 'weekly', 'monthly'] as const)"
+            :key="t"
+            type="button"
+            class="press focus-ring rounded-[var(--radius-pill)] px-3 py-1.5 text-sm font-medium capitalize"
+            :class="tab === t ? 'bg-brand-600 text-white' : 'bg-neutral-100 text-ink-muted'"
+            @click="tab = t"
+          >
+            {{ t }}
+          </button>
+        </div>
+        <p v-if="rangeLabel" class="hidden text-sm text-ink-subtle sm:block">{{ rangeLabel }}</p>
       </div>
+      <p v-if="rangeLabel" class="-mt-2 text-sm text-ink-subtle sm:hidden">{{ rangeLabel }}</p>
 
       <AppSkeleton v-if="loading" variant="stat-grid" />
 
-      <template v-else-if="tab === 'daily' && daily">
-        <h2 class="text-sm font-semibold text-ink-muted">{{ formatDateLabel(daily.date) }}</h2>
-        <div class="grid grid-cols-2 gap-3">
-          <StatTile label="Total Revenue" :value="formatPeso(daily.revenue)" tone="brand" />
-          <StatTile label="Cost of Goods" :value="formatPeso(daily.cost)" tone="accent" />
-          <StatTile label="Gross Profit" :value="formatPeso(daily.profit)" tone="teal" />
-          <StatTile label="Items Sold" :value="String(daily.itemsSold)" tone="amber" />
+      <template v-else-if="totals">
+        <div class="flex flex-wrap gap-8 border-b border-line pb-4">
+          <StatTile label="Sales" :value="formatPeso(totals.revenue)" />
+          <StatTile label="Cost" :value="formatPeso(totals.cost)" />
+          <StatTile label="Profit" :value="formatPeso(totals.profit)" />
         </div>
-        <StatTile label="Transactions" :value="String(daily.transactions)" />
-        <a
-          :href="`/api/export/sales?range=today`"
-          class="press focus-ring flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] border border-line py-3 text-center text-sm font-semibold text-ink"
-        >
-          <PhFileXls class="h-4 w-4" weight="bold" />
-          Export Daily Sales
-        </a>
-      </template>
 
-      <template v-else-if="tab === 'weekly' && weekly">
-        <h2 class="text-sm font-semibold text-ink-muted">{{ formatDateLabel(weekly.start) }} to {{ formatDateLabel(weekly.end) }}</h2>
-        <div class="grid grid-cols-2 gap-3">
-          <StatTile label="Revenue" :value="formatPeso(weekly.revenue)" tone="brand" />
-          <StatTile label="Cost" :value="formatPeso(weekly.cost)" tone="accent" />
-          <StatTile label="Gross Profit" :value="formatPeso(weekly.profit)" tone="teal" />
-          <StatTile label="Items Sold" :value="String(weekly.itemsSold)" tone="amber" />
-        </div>
-        <section v-if="weekly.topProducts.length">
-          <h3 class="mb-2 text-sm font-semibold text-ink-muted">Top Products</h3>
-          <ol class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-            <li v-for="(p, i) in weekly.topProducts" :key="p.productId" class="flex items-center justify-between px-4 py-2.5 text-sm">
-              <span>{{ i + 1 }}. {{ p.name }}<span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span></span>
-              <span class="font-medium tabular-nums">{{ p.quantitySold }} sold</span>
-            </li>
-          </ol>
-        </section>
-        <a
-          :href="`/api/export/sales?range=week`"
-          class="press focus-ring flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] border border-line py-3 text-center text-sm font-semibold text-ink"
-        >
-          <PhFileXls class="h-4 w-4" weight="bold" />
-          Export Weekly Sales
-        </a>
-      </template>
+        <div v-if="series.length || topProducts.length" class="grid gap-6 lg:grid-cols-2">
+          <section v-if="series.length" class="rounded-[var(--radius-card)] border border-line bg-surface p-4">
+            <h2 class="mb-3 text-sm font-semibold text-ink-muted">Daily sales</h2>
+            <svg
+              :viewBox="`0 0 ${CHART_W} ${CHART_H}`"
+              preserveAspectRatio="none"
+              class="h-32 w-full"
+              role="img"
+              :aria-label="`Daily sales, ${rangeLabel}`"
+            >
+              <rect
+                v-for="(p, i) in series"
+                :key="p.date"
+                :x="barX(i)"
+                :y="barY(p.revenue)"
+                :width="barWidth()"
+                :height="Math.max(barHeight(p.revenue), 0.5)"
+                rx="1"
+                fill="var(--color-brand-600)"
+              />
+            </svg>
+            <div class="mt-1 grid text-center text-[10px] text-ink-subtle" :style="{ gridTemplateColumns: `repeat(${series.length}, 1fr)` }">
+              <span v-for="p in series" :key="p.date">{{ dayLabel(p.date) }}</span>
+            </div>
+            <ul class="sr-only">
+              <li v-for="p in series" :key="p.date">{{ dayLabel(p.date) }}: {{ formatPeso(p.revenue) }}</li>
+            </ul>
+          </section>
 
-      <template v-else-if="tab === 'monthly' && monthly">
-        <h2 class="text-sm font-semibold text-ink-muted">{{ formatDateLabel(monthly.start) }} to {{ formatDateLabel(monthly.end) }}</h2>
-        <div class="grid grid-cols-2 gap-3">
-          <StatTile label="Revenue" :value="formatPeso(monthly.revenue)" tone="brand" />
-          <StatTile label="Cost" :value="formatPeso(monthly.cost)" tone="accent" />
-          <StatTile label="Gross Profit" :value="formatPeso(monthly.profit)" tone="teal" />
-          <StatTile label="Items Sold" :value="String(monthly.itemsSold)" tone="amber" />
+          <section v-if="topProducts.length">
+            <h2 class="mb-2 text-sm font-semibold text-ink-muted">Best sellers</h2>
+            <div class="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-line text-left text-xs font-medium uppercase tracking-wide text-ink-subtle">
+                    <th class="px-4 py-2.5 font-medium">Product</th>
+                    <th class="px-4 py-2.5 text-right font-medium">Units sold</th>
+                    <th class="px-4 py-2.5 text-right font-medium">Sales</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-line">
+                  <tr v-for="p in topProducts" :key="p.productId">
+                    <td class="px-4 py-2.5 text-ink">{{ p.name }}<span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span></td>
+                    <td class="px-4 py-2.5 text-right tabular-nums text-ink">{{ p.quantitySold }}</td>
+                    <td class="px-4 py-2.5 text-right tabular-nums text-ink">{{ formatPeso(p.revenue) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
-        <section v-if="monthly.topProducts.length">
-          <h3 class="mb-2 text-sm font-semibold text-ink-muted">Best-Selling Products</h3>
-          <ol class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-            <li v-for="(p, i) in monthly.topProducts" :key="p.productId" class="flex items-center justify-between px-4 py-2.5 text-sm">
-              <span>{{ i + 1 }}. {{ p.name }}<span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span></span>
-              <span class="font-medium tabular-nums">{{ p.quantitySold }} sold</span>
-            </li>
-          </ol>
-        </section>
-        <section v-if="monthly.lowestStock.length">
-          <h3 class="mb-2 text-sm font-semibold text-ink-muted">Lowest-Stock Products</h3>
+
+        <section v-if="lowestStock.length">
+          <h2 class="mb-2 text-sm font-semibold text-ink-muted">Lowest-stock products</h2>
           <ul class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-            <li v-for="p in monthly.lowestStock" :key="p.id" class="flex items-center justify-between px-4 py-2.5 text-sm">
+            <li v-for="p in lowestStock" :key="p.id" class="flex items-center justify-between px-4 py-2.5 text-sm">
               <span>{{ p.name }}<span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span></span>
-              <span class="font-medium tabular-nums">{{ p.stock }}</span>
+              <span class="font-medium tabular-nums text-ink">{{ p.stock }}</span>
             </li>
           </ul>
         </section>
-        <a
-          :href="`/api/export/sales?range=month`"
-          class="press focus-ring flex w-full items-center justify-center gap-2 rounded-[var(--radius-control)] border border-line py-3 text-center text-sm font-semibold text-ink"
-        >
-          <PhFileXls class="h-4 w-4" weight="bold" />
-          Export Monthly Sales
-        </a>
       </template>
     </div>
   </div>
