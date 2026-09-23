@@ -13,6 +13,9 @@ const error = ref('')
 let timer: ReturnType<typeof setTimeout> | undefined
 let controller: AbortController | undefined
 let latestRequest = 0
+let touchStartX = 0
+let touchStartY = 0
+let touchMoved = false
 
 async function load() {
   const requestId = ++latestRequest
@@ -60,6 +63,27 @@ function isLowStock(p: Product) {
 function clearSearch() {
   search.value = ''
   searchInput.value?.focus()
+}
+
+function startProductTouch(event: TouchEvent) {
+  const touch = event.touches[0]
+  if (!touch) return
+  touchStartX = touch.clientX
+  touchStartY = touch.clientY
+  touchMoved = false
+}
+
+function trackProductTouch(event: TouchEvent) {
+  const touch = event.touches[0]
+  if (!touch) return
+  if (Math.abs(touch.clientX - touchStartX) > 10 || Math.abs(touch.clientY - touchStartY) > 10) {
+    touchMoved = true
+  }
+}
+
+function finishProductTouch(productId: number) {
+  if (!touchMoved) navigateTo(`/products/${productId}`)
+  touchMoved = false
 }
 </script>
 
@@ -134,7 +158,10 @@ function clearSearch() {
             <NuxtLink
               :to="`/products/${p.id}`"
               class="focus-ring relative z-10 flex touch-manipulation items-center justify-between px-4 py-3 active:bg-neutral-50"
-              @touchend.prevent="navigateTo(`/products/${p.id}`)"
+              @touchstart="startProductTouch"
+              @touchmove="trackProductTouch"
+              @touchend.prevent="finishProductTouch(p.id)"
+              @touchcancel="touchMoved = false"
             >
               <div>
                 <p class="font-medium text-ink">{{ p.name }}<span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span></p>

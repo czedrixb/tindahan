@@ -15,9 +15,10 @@ const sellingPesos = ref<number | null>(null)
 const lowStockThreshold = ref(5)
 const savingDetails = ref(false)
 const message = ref('')
+const detailsDirty = ref(false)
 
 function syncForm() {
-  if (!product.value) return
+  if (!product.value || detailsDirty.value) return
   name.value = product.value.name
   variant.value = product.value.variant
   costPesos.value = product.value.costPrice === null ? null : centavosToPesos(product.value.costPrice)
@@ -40,6 +41,7 @@ async function saveDetails() {
         lowStockThreshold: lowStockThreshold.value,
       },
     })
+    detailsDirty.value = false
     await refresh()
     // The inline banner below already confirms success; a toast with
     // overlapping wording would just double up the same message on screen.
@@ -135,7 +137,7 @@ async function deactivate() {
     <div class="page-shell page-shell--form space-y-6">
       <p v-if="message" class="rounded-lg bg-success-50 px-3 py-2 text-sm text-success-700">{{ message }}</p>
 
-      <AppCard>
+      <AppCard @input="detailsDirty = true">
         <h2 class="mb-3 text-sm font-semibold text-ink-muted">Details</h2>
         <div class="space-y-3">
           <AppField label="Product Name" for="detail-name">
