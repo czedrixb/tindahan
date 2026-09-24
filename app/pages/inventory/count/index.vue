@@ -7,6 +7,7 @@ const toast = useToast()
 const counts = ref<InventoryCount[]>([])
 const starting = ref(false)
 const loading = ref(false)
+const pager = usePagination(computed(() => counts.value), 10)
 
 async function load() {
   loading.value = true
@@ -43,7 +44,7 @@ async function startCount() {
 
       <AppSkeleton v-if="loading" variant="list" />
       <ul v-else-if="counts.length" class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-        <li v-for="(c, i) in counts" :key="c.id" class="list-enter-item" :style="{ '--i': i }">
+        <li v-for="(c, i) in pager.pageItems.value" :key="c.id" class="list-enter-item" :style="{ '--i': i }">
           <NuxtLink :to="`/inventory/count/${c.id}`" class="focus-ring flex items-center justify-between px-4 py-3 active:bg-neutral-50">
             <div>
               <p class="font-medium text-ink">{{ formatDateLabel(c.countDate) }}</p>
@@ -55,6 +56,14 @@ async function startCount() {
           </NuxtLink>
         </li>
       </ul>
+      <AppPagination
+        v-if="counts.length"
+        :page="pager.currentPage.value"
+        :total-items="counts.length"
+        :page-size="10"
+        label="Inventory count pages"
+        @change="pager.setPage"
+      />
       <AppEmpty v-else :icon="PhClipboardText" message="No inventory counts yet." />
     </div>
   </div>

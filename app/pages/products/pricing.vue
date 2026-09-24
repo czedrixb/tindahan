@@ -7,6 +7,7 @@ const toast = useToast()
 const products = ref<Product[]>([])
 const drafts = reactive<Record<number, { cost: number | null; selling: number | null }>>({})
 const savingId = ref<number | null>(null)
+const pager = usePagination(computed(() => products.value), 10)
 
 async function load() {
   const rows = await $fetch<Product[]>('/api/products', { query: { needsPricing: 'true', active: 'true' } })
@@ -47,8 +48,8 @@ async function save(product: Product) {
       <AppEmpty v-if="!products.length" :icon="PhTag" message="All products are priced." />
 
       <ul v-else class="space-y-3">
-        <li v-for="p in products" :key="p.id" class="rounded-[var(--radius-card)] border border-line bg-surface p-4">
-          <p class="font-medium text-ink">{{ p.name }}<span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span></p>
+        <li v-for="p in pager.pageItems.value" :key="p.id" class="rounded-[var(--radius-card)] border border-line bg-surface p-4">
+          <p class="font-medium text-ink">{{ formatProductText(p.name) }}<span v-if="p.variant" class="text-ink-subtle"> · {{ formatProductText(p.variant) }}</span></p>
           <p class="text-xs text-ink-subtle">Stock: {{ p.stock }}</p>
           <div class="mt-2 flex gap-2">
             <input
@@ -79,6 +80,13 @@ async function save(product: Product) {
           </div>
         </li>
       </ul>
+      <AppPagination
+        :page="pager.currentPage.value"
+        :total-items="products.length"
+        :page-size="10"
+        label="Needs pricing pages"
+        @change="pager.setPage"
+      />
     </div>
   </div>
 </template>

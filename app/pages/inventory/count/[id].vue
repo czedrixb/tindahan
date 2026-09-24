@@ -49,6 +49,8 @@ async function completeCount() {
 
 const isInProgress = computed(() => count.value?.status === 'IN_PROGRESS')
 const countedItems = computed(() => count.value?.items.filter((i) => i.actualQuantity !== null).length ?? 0)
+const countItems = computed(() => count.value?.items ?? [])
+const pager = usePagination(countItems, 10)
 </script>
 
 <template>
@@ -74,9 +76,9 @@ const countedItems = computed(() => count.value?.items.filter((i) => i.actualQua
             </tr>
           </thead>
           <tbody class="divide-y divide-line">
-            <tr v-for="item in count.items" :key="item.id">
+            <tr v-for="item in pager.pageItems.value" :key="item.id">
               <td class="px-3 py-2">
-                {{ item.productName }}<span v-if="item.productVariant" class="text-ink-subtle"> · {{ item.productVariant }}</span>
+                {{ formatProductText(item.productName) }}<span v-if="item.productVariant" class="text-ink-subtle"> · {{ formatProductText(item.productVariant) }}</span>
               </td>
               <td class="px-3 py-2 text-right tabular-nums">{{ item.expectedQuantity }}</td>
               <td class="px-3 py-2 text-right">
@@ -102,6 +104,13 @@ const countedItems = computed(() => count.value?.items.filter((i) => i.actualQua
           </tbody>
         </table>
       </div>
+      <AppPagination
+        :page="pager.currentPage.value"
+        :total-items="countItems.length"
+        :page-size="10"
+        label="Inventory count item pages"
+        @change="pager.setPage"
+      />
 
       <AppButton v-if="isInProgress" block :loading="completing" data-testid="complete-count" @click="completeCount">
         {{ completing ? 'Saving' : 'Save Count & Apply Adjustments' }}

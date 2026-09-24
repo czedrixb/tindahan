@@ -28,7 +28,10 @@ async function load() {
   }
 }
 
-watch(range, load)
+watch(range, () => {
+  pager.resetPage()
+  load()
+})
 onMounted(load)
 
 interface Receipt {
@@ -60,9 +63,11 @@ const receipts = computed(() => {
   return Array.from(byTransaction.values())
 })
 
+const pager = usePagination(receipts, 10)
+
 const groups = computed(() => {
   const byDay = new Map<string, Receipt[]>()
-  for (const receipt of receipts.value) {
+  for (const receipt of pager.pageItems.value) {
     const key = formatDateLabel(receipt.soldAt)
     if (!byDay.has(key)) byDay.set(key, [])
     byDay.get(key)!.push(receipt)
@@ -139,7 +144,7 @@ async function voidReceipt(receipt: Receipt) {
             >
               <div v-for="line in receipt.lines" :key="line.id" class="flex items-center justify-between py-1">
                 <p class="text-sm text-ink">
-                  {{ line.productName }}<span v-if="line.productVariant" class="text-ink-subtle"> · {{ line.productVariant }}</span>
+                  {{ formatProductText(line.productName) }}<span v-if="line.productVariant" class="text-ink-subtle"> · {{ formatProductText(line.productVariant) }}</span>
                   <span class="text-ink-subtle"> ×{{ line.quantity }}</span>
                 </p>
                 <span class="tabular-nums text-ink-muted">{{ formatPeso(line.revenue) }}</span>
@@ -163,6 +168,13 @@ async function voidReceipt(receipt: Receipt) {
             </li>
           </ul>
         </section>
+        <AppPagination
+          :page="pager.currentPage.value"
+          :total-items="receipts.length"
+          :page-size="10"
+          label="Sales history pages"
+          @change="pager.setPage"
+        />
       </div>
     </div>
   </div>

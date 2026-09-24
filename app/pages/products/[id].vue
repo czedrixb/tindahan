@@ -132,7 +132,7 @@ async function deactivate() {
 
 <template>
   <div v-if="product">
-    <PageHeader :title="product.name" :subtitle="product.variant || undefined" />
+    <PageHeader :title="formatProductText(product.name)" :subtitle="product.variant ? formatProductText(product.variant) : undefined" />
 
     <div class="page-shell page-shell--form space-y-6">
       <p v-if="message" class="rounded-lg bg-success-50 px-3 py-2 text-sm text-success-700">{{ message }}</p>

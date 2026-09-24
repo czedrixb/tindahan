@@ -15,6 +15,8 @@ interface AuditEntry {
 }
 
 const { data: entries, status } = await useFetch<AuditEntry[]>('/api/audit')
+const auditEntries = computed(() => entries.value ?? [])
+const pager = usePagination(auditEntries, 10)
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
@@ -28,7 +30,7 @@ function formatTime(value: string) {
       <AppSkeleton v-if="status === 'pending'" variant="list" />
       <AppEmpty v-else-if="!entries?.length" :icon="PhClockCounterClockwise" message="No activity recorded yet." />
       <ol v-else class="space-y-3" data-testid="audit-log">
-        <li v-for="(entry, i) in entries" :key="entry.id" class="list-enter-item rounded-[var(--radius-card)] border border-line bg-surface p-4" :style="{ '--i': i }">
+        <li v-for="(entry, i) in pager.pageItems.value" :key="entry.id" class="list-enter-item rounded-[var(--radius-card)] border border-line bg-surface p-4" :style="{ '--i': i }">
           <div class="flex items-start justify-between gap-3">
             <div>
               <p class="font-medium text-ink">{{ entry.description }}</p>
@@ -41,6 +43,14 @@ function formatTime(value: string) {
           <time class="mt-2 block text-xs text-ink-subtle" :datetime="entry.createdAt">{{ formatTime(entry.createdAt) }}</time>
         </li>
       </ol>
+      <AppPagination
+        v-if="auditEntries.length"
+        :page="pager.currentPage.value"
+        :total-items="auditEntries.length"
+        :page-size="10"
+        label="Audit log pages"
+        @change="pager.setPage"
+      />
     </div>
   </div>
 </template>
