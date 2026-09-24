@@ -31,6 +31,6 @@ export default defineConfig({
     command: 'npx tsx scripts/e2e-server.ts',
     url: 'http://localhost:3211/api/auth/session',
     reuseExistingServer: false,
-    timeout: 120_000,
+    timeout: 180_000,
   },
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PhMagnifyingGlass, PhPackage, PhPlus, PhX } from '@phosphor-icons/vue'
+import { PhCaretDown, PhCaretUp, PhCaretUpDown, PhMagnifyingGlass, PhPackage, PhPlus, PhX } from '@phosphor-icons/vue'
 import type { Product } from '~/types'
 
 const toast = useToast()
@@ -8,6 +8,22 @@ const search = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
 const lowStockOnly = ref(false)
 const products = ref<Product[]>([])
+type SortKey = 'name' | 'variant' | 'stock' | 'costPrice' | 'sellingPrice'
+const sortKey = ref<SortKey>('name')
+const sortDirection = ref<'asc' | 'desc'>('asc')
+const collator = new Intl.Collator('en-PH', { sensitivity: 'base', numeric: true })
+const sortedProducts = computed(() => [...products.value].sort((a, b) => {
+  const aValue = a[sortKey.value]
+  const bValue = b[sortKey.value]
+  if (aValue === null && bValue !== null) return 1
+  if (aValue !== null && bValue === null) return -1
+  let result = 0
+  if (typeof aValue === 'string' && typeof bValue === 'string') result = collator.compare(aValue, bValue)
+  else result = Number(aValue) - Number(bValue)
+  if (result === 0) result = a.id - b.id
+  return sortDirection.value === 'asc' ? result : -result
+}))
+const pager = usePagination(sortedProducts, 10)
 const loading = ref(false)
 const error = ref('')
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -32,7 +48,10 @@ async function load() {
         lowStock: lowStockOnly.value ? 'true' : undefined,
       },
     })
-    if (requestId === latestRequest) products.value = result
+    if (requestId === latestRequest) {
+      products.value = result
+      pager.resetPage()
+    }
   } catch (err: unknown) {
     if (requestId !== latestRequest || (err instanceof DOMException && err.name === 'AbortError')) return
     error.value = apiErrorMessage(err, 'Could not load inventory')
@@ -63,6 +82,25 @@ function isLowStock(p: Product) {
 function clearSearch() {
   search.value = ''
   searchInput.value?.focus()
+}
+
+function setSort(key: SortKey) {
+  if (sortKey.value === key) sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+  else {
+    sortKey.value = key
+    sortDirection.value = 'asc'
+  }
+  pager.resetPage()
+}
+
+function ariaSort(key: SortKey) {
+  if (sortKey.value !== key) return 'none' as const
+  return sortDirection.value === 'asc' ? 'ascending' as const : 'descending' as const
+}
+
+function sortIcon(key: SortKey) {
+  if (sortKey.value !== key) return PhCaretUpDown
+  return sortDirection.value === 'asc' ? PhCaretUp : PhCaretDown
 }
 
 function startProductTouch(event: TouchEvent) {
@@ -154,7 +192,7 @@ function finishProductTouch(productId: number) {
 
       <template v-else>
         <ul class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface lg:hidden">
-          <li v-for="(p, i) in products" :key="p.id" class="list-enter-item" :style="{ '--i': i }">
+          <li v-for="(p, i) in pager.pageItems.value" :key="p.id" class="list-enter-item" :style="{ '--i': i }">
             <NuxtLink
               :to="`/products/${p.id}`"
               class="focus-ring relative z-10 flex touch-manipulation items-center justify-between px-4 py-3 active:bg-neutral-50"
@@ -164,7 +202,7 @@ function finishProductTouch(productId: number) {
               @touchcancel="touchMoved = false"
             >
               <div>
-                <p class="font-medium text-ink">{{ p.name }}<span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span></p>
+                <p class="font-medium text-ink">{{ formatProductText(p.name) }}<span v-if="p.variant" class="text-ink-subtle"> · {{ formatProductText(p.variant) }}</span></p>
                 <p v-if="p.costPrice === null || p.sellingPrice === null" class="text-xs text-warn-600">Needs pricing</p>
               </div>
               <div class="text-right">
@@ -181,20 +219,30 @@ function finishProductTouch(productId: number) {
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-line text-left text-xs font-medium uppercase tracking-wide text-ink-subtle">
-                <th class="px-4 py-3 font-medium">Product</th>
-                <th class="px-4 py-3 font-medium">Variant</th>
-                <th class="px-4 py-3 text-right font-medium">In stock</th>
-                <th class="px-4 py-3 text-right font-medium">Cost</th>
-                <th class="px-4 py-3 text-right font-medium">Selling price</th>
+                <th class="px-4 py-3 font-medium" :aria-sort="ariaSort('name')">
+                  <button type="button" class="focus-ring inline-flex items-center gap-1 rounded" @click="setSort('name')">Product <component :is="sortIcon('name')" class="h-3.5 w-3.5" aria-hidden="true" /></button>
+                </th>
+                <th class="px-4 py-3 font-medium" :aria-sort="ariaSort('variant')">
+                  <button type="button" class="focus-ring inline-flex items-center gap-1 rounded" @click="setSort('variant')">Variant <component :is="sortIcon('variant')" class="h-3.5 w-3.5" aria-hidden="true" /></button>
+                </th>
+                <th class="px-4 py-3 text-right font-medium" :aria-sort="ariaSort('stock')">
+                  <button type="button" class="focus-ring ml-auto inline-flex items-center gap-1 rounded" @click="setSort('stock')">In stock <component :is="sortIcon('stock')" class="h-3.5 w-3.5" aria-hidden="true" /></button>
+                </th>
+                <th class="px-4 py-3 text-right font-medium" :aria-sort="ariaSort('costPrice')">
+                  <button type="button" class="focus-ring ml-auto inline-flex items-center gap-1 rounded" @click="setSort('costPrice')">Cost <component :is="sortIcon('costPrice')" class="h-3.5 w-3.5" aria-hidden="true" /></button>
+                </th>
+                <th class="px-4 py-3 text-right font-medium" :aria-sort="ariaSort('sellingPrice')">
+                  <button type="button" class="focus-ring ml-auto inline-flex items-center gap-1 rounded" @click="setSort('sellingPrice')">Selling price <component :is="sortIcon('sellingPrice')" class="h-3.5 w-3.5" aria-hidden="true" /></button>
+                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-line">
-              <tr v-for="p in products" :key="p.id">
+              <tr v-for="p in pager.pageItems.value" :key="p.id">
                 <td class="px-4 py-3 font-medium text-ink">
-                  <NuxtLink :to="`/products/${p.id}`" class="focus-ring rounded hover:text-brand-700">{{ p.name }}</NuxtLink>
+                  <NuxtLink :to="`/products/${p.id}`" class="focus-ring rounded hover:text-brand-700">{{ formatProductText(p.name) }}</NuxtLink>
                   <p v-if="p.costPrice === null || p.sellingPrice === null" class="text-xs font-normal text-warn-600">Needs pricing</p>
                 </td>
-                <td class="px-4 py-3 text-ink-subtle">{{ p.variant || '—' }}</td>
+                <td class="px-4 py-3 text-ink-subtle">{{ p.variant ? formatProductText(p.variant) : '—' }}</td>
                 <td class="px-4 py-3 text-right tabular-nums" :class="isLowStock(p) ? 'font-semibold text-warn-700' : 'text-ink'">
                   {{ p.stock }}<span v-if="isLowStock(p)" class="ml-1.5 text-xs font-normal">Low</span>
                 </td>
@@ -204,6 +252,13 @@ function finishProductTouch(productId: number) {
             </tbody>
           </table>
         </div>
+        <AppPagination
+          :page="pager.currentPage.value"
+          :total-items="sortedProducts.length"
+          :page-size="10"
+          label="Inventory pages"
+          @change="pager.setPage"
+        />
       </template>
     </div>
   </div>

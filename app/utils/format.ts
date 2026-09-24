@@ -34,6 +34,12 @@ export function formatTimeLabel(value: string | Date): string {
   return date.toLocaleTimeString('en-PH', { timeZone: STORE_TZ, hour: 'numeric', minute: '2-digit' })
 }
 
+// Capitalize product labels for presentation without rewriting stored values or
+// flattening intentional acronyms ("USA", "XL") to lowercase.
+export function formatProductText(value: string): string {
+  return value.replace(/(^|[\s\-/])([\p{L}])/gu, (_, boundary: string, letter: string) => `${boundary}${letter.toLocaleUpperCase('en-PH')}`)
+}
+
 // Every mutation catch block needs to pull a human-readable message out of a
 // $fetch error. This was copy-pasted inline in 8+ places; centralized here.
 //

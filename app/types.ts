@@ -78,6 +78,15 @@ export interface RecentSale {
   id: number
   revenue: number
   soldAt: string
+  lines: RecentSaleLine[]
+}
+
+export interface RecentSaleLine {
+  id: number
+  productId: number
+  productName: string
+  productVariant: string
+  quantity: number
 }
 
 export interface DashboardSummary {

@@ -257,8 +257,8 @@ onBeforeRouteLeave(async (to) => {
           <ul class="divide-y divide-line">
             <li v-for="line in completedSale.lines" :key="line.id" class="py-2" data-testid="summary-line">
               <p class="font-semibold text-ink">
-                {{ line.productName
-                }}<span v-if="line.productVariant" class="font-normal text-ink-subtle"> · {{ line.productVariant }}</span>
+                {{ formatProductText(line.productName)
+                }}<span v-if="line.productVariant" class="font-normal text-ink-subtle"> · {{ formatProductText(line.productVariant) }}</span>
               </p>
               <p class="text-sm text-ink-subtle">
                 {{ line.quantity }} × {{ formatPeso(line.sellingPrice) }} = {{ formatPeso(line.revenue) }}
@@ -331,8 +331,8 @@ onBeforeRouteLeave(async (to) => {
                   @touchend.prevent="addToCart(p)"
                 >
                   <span>
-                    <span class="font-medium text-ink">{{ p.name }}</span>
-                    <span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span>
+                    <span class="font-medium text-ink">{{ formatProductText(p.name) }}</span>
+                    <span v-if="p.variant" class="text-ink-subtle"> · {{ formatProductText(p.variant) }}</span>
                   </span>
                   <span class="flex items-center gap-3 text-xs text-ink-subtle">
                     {{ formatPeso(p.sellingPrice ?? 0) }} · {{ p.stock }} in stock
@@ -363,8 +363,8 @@ onBeforeRouteLeave(async (to) => {
                       @touchend.prevent="addToCart(p)"
                     >
                       <span>
-                        <span class="font-medium text-ink">{{ p.name }}</span>
-                        <span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span>
+                        <span class="font-medium text-ink">{{ formatProductText(p.name) }}</span>
+                        <span v-if="p.variant" class="text-ink-subtle"> · {{ formatProductText(p.variant) }}</span>
                       </span>
                       <span class="flex items-center gap-3 text-xs text-ink-subtle">
                         {{ formatPeso(p.sellingPrice ?? 0) }} · {{ p.stock }} in stock
@@ -395,8 +395,8 @@ onBeforeRouteLeave(async (to) => {
                 <div class="flex items-center justify-between">
                   <div>
                     <p class="font-semibold text-ink">
-                      {{ line.product.name
-                      }}<span v-if="line.product.variant" class="font-normal text-ink-subtle"> · {{ line.product.variant }}</span>
+                      {{ formatProductText(line.product.name)
+                      }}<span v-if="line.product.variant" class="font-normal text-ink-subtle"> · {{ formatProductText(line.product.variant) }}</span>
                     </p>
                     <p class="text-xs text-ink-subtle">{{ formatPeso(line.product.sellingPrice ?? 0) }} each · {{ line.product.stock }} in stock</p>
                   </div>

@@ -37,6 +37,7 @@ const resetCanSubmit = computed(
 const myId = computed(() => session.value?.user?.id)
 const activeAdminCount = computed(() => users.value?.filter((u) => u.role === 'ADMIN' && u.isActive).length ?? 0)
 const sorted = computed(() => [...(users.value ?? [])].sort((a, b) => Number(b.isActive) - Number(a.isActive)))
+const pager = usePagination(sorted, 10)
 
 function isLastActiveAdmin(u: StoreUser) {
   return u.role === 'ADMIN' && u.isActive && activeAdminCount.value <= 1
@@ -192,7 +193,7 @@ function submitEdit(u: StoreUser) {
         </AppCard>
 
         <ul class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-          <li v-for="u in sorted" :key="u.id" :data-testid="`user-row-${u.username}`" class="px-4 py-3" :class="u.isActive ? '' : 'opacity-60'">
+          <li v-for="u in pager.pageItems.value" :key="u.id" :data-testid="`user-row-${u.username}`" class="px-4 py-3" :class="u.isActive ? '' : 'opacity-60'">
             <button
               type="button"
               class="focus-ring flex w-full items-start justify-between gap-3 text-left"
@@ -305,6 +306,13 @@ function submitEdit(u: StoreUser) {
             </div>
           </li>
         </ul>
+        <AppPagination
+          :page="pager.currentPage.value"
+          :total-items="sorted.length"
+          :page-size="10"
+          label="User account pages"
+          @change="pager.setPage"
+        />
 
         <p class="text-xs text-ink-subtle">Deactivating keeps the person's past activity in the audit log.</p>
       </section>

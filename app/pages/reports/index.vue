@@ -24,7 +24,11 @@ async function load() {
   }
 }
 
-watch(tab, load)
+watch(tab, () => {
+  topProductsPager.resetPage()
+  lowestStockPager.resetPage()
+  load()
+})
 onMounted(load)
 
 const RANGE_PARAM = { daily: 'today', weekly: 'week', monthly: 'month' } as const
@@ -55,6 +59,8 @@ const topProducts = computed<TopProduct[]>(() => {
   return []
 })
 const lowestStock = computed(() => monthly.value?.lowestStock ?? [])
+const topProductsPager = usePagination(topProducts, 10)
+const lowestStockPager = usePagination(lowestStock, 10)
 
 const CHART_W = 100
 const CHART_H = 36
@@ -166,25 +172,39 @@ function dayLabel(dateKey: string) {
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-line">
-                  <tr v-for="p in topProducts" :key="p.productId">
-                    <td class="px-4 py-2.5 text-ink">{{ p.name }}<span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span></td>
+                  <tr v-for="p in topProductsPager.pageItems.value" :key="p.productId">
+                    <td class="px-4 py-2.5 text-ink">{{ formatProductText(p.name) }}<span v-if="p.variant" class="text-ink-subtle"> · {{ formatProductText(p.variant) }}</span></td>
                     <td class="px-4 py-2.5 text-right tabular-nums text-ink">{{ p.quantitySold }}</td>
                     <td class="px-4 py-2.5 text-right tabular-nums text-ink">{{ formatPeso(p.revenue) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
+            <AppPagination
+              :page="topProductsPager.currentPage.value"
+              :total-items="topProducts.length"
+              :page-size="10"
+              label="Best seller pages"
+              @change="topProductsPager.setPage"
+            />
           </section>
         </div>
 
         <section v-if="lowestStock.length">
           <h2 class="mb-2 text-sm font-semibold text-ink-muted">Lowest-stock products</h2>
           <ul class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
-            <li v-for="p in lowestStock" :key="p.id" class="flex items-center justify-between px-4 py-2.5 text-sm">
-              <span>{{ p.name }}<span v-if="p.variant" class="text-ink-subtle"> · {{ p.variant }}</span></span>
+            <li v-for="p in lowestStockPager.pageItems.value" :key="p.id" class="flex items-center justify-between px-4 py-2.5 text-sm">
+              <span>{{ formatProductText(p.name) }}<span v-if="p.variant" class="text-ink-subtle"> · {{ formatProductText(p.variant) }}</span></span>
               <span class="font-medium tabular-nums text-ink">{{ p.stock }}</span>
             </li>
           </ul>
+          <AppPagination
+            :page="lowestStockPager.currentPage.value"
+            :total-items="lowestStock.length"
+            :page-size="10"
+            label="Lowest stock product pages"
+            @change="lowestStockPager.setPage"
+          />
         </section>
       </template>
     </div>
