@@ -1,9 +1,10 @@
 import { asc } from 'drizzle-orm'
-import { users } from '../../db/schema'
+import { userStores, users } from '../../db/schema'
 
 export default defineEventHandler(async (event) => {
   requireAdmin(event)
-  return useDb()
+  const db = useDb()
+  const accounts = await db
     .select({
       id: users.id,
       username: users.username,
@@ -15,4 +16,10 @@ export default defineEventHandler(async (event) => {
     })
     .from(users)
     .orderBy(asc(users.displayName))
+  const assignments = await db.select().from(userStores)
+  return accounts.map((account) => ({
+    ...account,
+    storeIds: assignments.filter((item) => item.userId === account.id).map((item) => item.storeId),
+    defaultStoreId: assignments.find((item) => item.userId === account.id && item.isDefault)?.storeId ?? null,
+  }))
 })

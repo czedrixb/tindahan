@@ -1,13 +1,13 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { inventoryCountItems, inventoryCounts } from '../../../db/schema'
 
 export default defineEventHandler(async (event) => {
   const id = parseIdParam(event)
   const db = useDb()
-  requireUser(event)
+  const { store } = requireStoreAccess(event)
 
   const result = await db.transaction(async (tx) => {
-    const [count] = await tx.select().from(inventoryCounts).where(eq(inventoryCounts.id, id))
+    const [count] = await tx.select().from(inventoryCounts).where(and(eq(inventoryCounts.id, id), eq(inventoryCounts.storeId, store.id)))
     if (!count) throw createError({ statusCode: 404, statusMessage: 'Inventory count not found' })
     if (count.status !== 'IN_PROGRESS') {
       throw createError({ statusCode: 400, statusMessage: 'Inventory count is already completed' })
@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
     const items = await tx
       .select()
       .from(inventoryCountItems)
-      .where(eq(inventoryCountItems.inventoryCountId, id))
+      .where(and(eq(inventoryCountItems.inventoryCountId, id), eq(inventoryCountItems.storeId, store.id)))
 
     for (const item of items) {
       if (item.actualQuantity === null) continue
@@ -24,6 +24,7 @@ export default defineEventHandler(async (event) => {
 
       await setAbsoluteStock(tx, {
         productId: item.productId,
+        storeId: store.id,
         target: item.actualQuantity,
         type: 'ADJUSTMENT',
         reason: `Inventory count #${id}`,

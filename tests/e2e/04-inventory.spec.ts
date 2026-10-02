@@ -22,6 +22,8 @@ test('products and bottom navigation stay tappable on a populated mobile invento
   })))
 
   await page.goto('/inventory')
+  await page.getByPlaceholder('Search inventory...').fill(product.name)
+  await page.getByPlaceholder('Search inventory...').blur()
   const productLink = page.getByRole('link', { name: new RegExp(product.name) })
   await expect(productLink).toBeVisible()
 
@@ -128,6 +130,7 @@ test('swiping over a mobile inventory row scrolls without opening the product', 
   })))
 
   await page.goto('/inventory')
+  await page.getByPlaceholder('Search inventory...').fill('Swipe Guard Product')
   const productLink = page.getByRole('link', { name: new RegExp(products[0].name) })
   await expect(productLink).toBeVisible()
 

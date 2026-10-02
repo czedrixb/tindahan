@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { users } from '../db/schema'
+import { userStores, users } from '../db/schema'
 
 export default defineNitroPlugin(async () => {
   const config = useRuntimeConfig()
@@ -38,14 +38,15 @@ export default defineNitroPlugin(async () => {
       .where(sql`lower(${users.username}) = lower(${username})`)
       .limit(1)
     if (!existing) {
-      await db.insert(users).values({
+      const [created] = await db.insert(users).values({
         username,
         displayName: String(config.storeDisplayName).trim() || username,
         passwordHash: config.storePasswordHash,
         role: 'ADMIN',
         isActive: true,
         mustChangePassword: false,
-      })
+      }).returning({ id: users.id })
+      await db.insert(userStores).values({ userId: created.id, storeId: 1, isDefault: true })
     } else {
       // Re-pinned on every boot: this account is the documented owner-recovery
       // path (set STORE_PASSWORD_HASH and restart), so it must always come

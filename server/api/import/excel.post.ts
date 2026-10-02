@@ -1,4 +1,5 @@
-import { products } from '../../db/schema'
+import { and, eq } from 'drizzle-orm'
+import { products, storeProducts } from '../../db/schema'
 
 function productKey(name: string | null | undefined, variant: string | null | undefined) {
   return `${name?.trim().toLowerCase() ?? ''}|${variant?.trim().toLowerCase() ?? ''}`
@@ -18,9 +19,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = useDb()
+  const { store } = requireStoreAccess(event)
   const existing = await db
-    .select({ id: products.id, name: products.name, variant: products.variant, stock: products.stock })
+    .select({ id: products.id, name: products.name, variant: products.variant, stock: storeProducts.stock })
     .from(products)
+    .leftJoin(storeProducts, and(eq(storeProducts.productId, products.id), eq(storeProducts.storeId, store.id)))
 
   // Older imports may contain incomplete product values. Treat those as an
   // empty identifier component instead of letting a null value abort the
@@ -40,6 +43,7 @@ export default defineEventHandler(async (event) => {
   return {
     hasHeader: parsed.hasHeader,
     hasPrices: parsed.hasPrices,
+    destinationStore: store,
     totalRows: rows.length,
     toCreate: rows.filter((r) => r.action === 'create').length,
     toUpdate: rows.filter((r) => r.action === 'update').length,

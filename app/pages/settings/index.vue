@@ -41,7 +41,7 @@ async function commitImport() {
   if (!preview.value) return
 
   const ok = await confirm({
-    title: 'Import this spreadsheet?',
+    title: `Import into ${preview.value.destinationStore.name}?`,
     body: importStock.value
       ? `This creates ${preview.value.toCreate} products and sets their stock to the quantities in the spreadsheet. It also rewrites stock on ${preview.value.toUpdate} existing ones.`
       : `This creates ${preview.value.toCreate} products without changing stock. New products will start at 0 until stock is updated.`,
@@ -142,6 +142,7 @@ async function logout() {
           <p v-if="error" class="mt-2 rounded-lg bg-danger-50 px-3 py-2 text-sm text-danger-600">{{ error }}</p>
 
           <div v-if="preview" class="mt-3 space-y-2 rounded-lg bg-surface-sunken p-3 text-sm" data-testid="import-preview">
+            <p class="font-semibold text-brand-700">Destination: {{ preview.destinationStore.name }}</p>
             <p>{{ preview.totalRows }} rows found. {{ preview.toCreate }} new, {{ preview.toUpdate }} to update.</p>
             <p v-if="!preview.hasPrices" class="text-warn-600">No prices found in this file. Imported products will need pricing.</p>
             <label class="flex items-start gap-2 text-xs text-ink-muted">

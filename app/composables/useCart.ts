@@ -13,6 +13,7 @@ interface StoredCart {
 }
 
 const STORAGE_KEY = 'tindahan:cart'
+const storeStorageKey = (storeId: number) => `${STORAGE_KEY}:${storeId}`
 // Pre-rebrand key. Read once as a fallback so an in-progress sale started
 // before the rename still survives a reload; never written to again.
 const LEGACY_STORAGE_KEY = 'sari-sari:cart'
@@ -30,6 +31,9 @@ function useCartCash() {
 function useCartSubmissionKey() {
   return useState<string>('cart:submission-key', () => '')
 }
+function useCartStoreId() {
+  return useState<number>('cart:store-id', () => 0)
+}
 
 // Module-level, client-only guards. Mutated only inside `import.meta.client`
 // branches below, which are dead-code-eliminated from the server bundle, so
@@ -37,12 +41,13 @@ function useCartSubmissionKey() {
 let hydrated = false
 let persistScope: EffectScope | null = null
 
-function persist(lines: CartLine[], cash: string, submissionKey: string) {
+function persist(storeId: number, lines: CartLine[], cash: string, submissionKey: string) {
+  if (!storeId) return
   try {
     if (lines.length === 0) {
-      sessionStorage.removeItem(STORAGE_KEY)
+      sessionStorage.removeItem(storeStorageKey(storeId))
     } else {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ lines, cash, submissionKey } satisfies StoredCart))
+      sessionStorage.setItem(storeStorageKey(storeId), JSON.stringify({ lines, cash, submissionKey } satisfies StoredCart))
     }
   } catch {
     // Storage can be unavailable (private browsing, quota) - the cart still
@@ -54,6 +59,29 @@ export function useCart() {
   const lines = useCartLines()
   const cash = useCartCash()
   const submissionKey = useCartSubmissionKey()
+  const activeStoreId = useCartStoreId()
+  const { session } = useSession()
+
+  function loadStored(storeId: number) {
+    lines.value = []
+    cash.value = ''
+    submissionKey.value = ''
+    if (!storeId) return
+    try {
+      let raw = sessionStorage.getItem(storeStorageKey(storeId))
+      if (!raw && storeId === 1) raw = sessionStorage.getItem(STORAGE_KEY) ?? sessionStorage.getItem(LEGACY_STORAGE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as Partial<StoredCart>
+      lines.value = Array.isArray(parsed.lines) ? parsed.lines : []
+      cash.value = typeof parsed.cash === 'string' ? parsed.cash : ''
+      submissionKey.value = typeof parsed.submissionKey === 'string' ? parsed.submissionKey : ''
+      sessionStorage.removeItem(STORAGE_KEY)
+      sessionStorage.removeItem(LEGACY_STORAGE_KEY)
+      persist(storeId, lines.value, cash.value, submissionKey.value)
+    } catch {
+      // Corrupt or inaccessible storage starts this store with an empty cart.
+    }
+  }
 
   if (import.meta.client) {
     // Hydrate from sessionStorage once per browser tab, after mount - never
@@ -64,22 +92,8 @@ export function useCart() {
     onMounted(() => {
       if (hydrated) return
       hydrated = true
-      try {
-        let raw = sessionStorage.getItem(STORAGE_KEY)
-        const isLegacy = raw === null
-        if (isLegacy) raw = sessionStorage.getItem(LEGACY_STORAGE_KEY)
-        if (!raw) return
-        const parsed = JSON.parse(raw) as Partial<StoredCart>
-        lines.value = Array.isArray(parsed.lines) ? parsed.lines : []
-        cash.value = typeof parsed.cash === 'string' ? parsed.cash : ''
-        submissionKey.value = typeof parsed.submissionKey === 'string' ? parsed.submissionKey : ''
-        if (isLegacy) {
-          sessionStorage.removeItem(LEGACY_STORAGE_KEY)
-          persist(lines.value, cash.value, submissionKey.value)
-        }
-      } catch {
-        // Corrupt or inaccessible storage - start with an empty cart.
-      }
+      activeStoreId.value = session.value?.activeStore?.id ?? 0
+      loadStored(activeStoreId.value)
     })
 
     // A plain watch() here would be owned by whichever component first calls
@@ -89,7 +103,7 @@ export function useCart() {
     if (!persistScope) {
       persistScope = effectScope(true)
       persistScope.run(() => {
-        watch([lines, cash, submissionKey], ([l, c, k]) => persist(l, c, k), { deep: true })
+        watch([lines, cash, submissionKey], ([l, c, k]) => persist(activeStoreId.value, l, c, k), { deep: true })
       })
     }
   }
@@ -100,5 +114,13 @@ export function useCart() {
     submissionKey.value = ''
   }
 
-  return { lines, cash, submissionKey, clear }
+  function switchStore(storeId: number) {
+    if (import.meta.client) {
+      persist(activeStoreId.value, lines.value, cash.value, submissionKey.value)
+      activeStoreId.value = storeId
+      loadStored(storeId)
+    }
+  }
+
+  return { lines, cash, submissionKey, clear, switchStore }
 }

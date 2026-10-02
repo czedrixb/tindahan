@@ -1,5 +1,7 @@
 export type UserRole = 'ADMIN' | 'MEMBER'
 
+export interface StoreSummary { id: number; code: string; name: string }
+
 export interface StoreUser {
   id: number
   username: string
@@ -8,11 +10,15 @@ export interface StoreUser {
   isActive: boolean
   mustChangePassword: boolean
   createdAt: string
+  storeIds: number[]
+  defaultStoreId: number | null
 }
 
 export interface SessionResponse {
   authenticated: boolean
   user: Pick<StoreUser, 'id' | 'username' | 'displayName' | 'role' | 'mustChangePassword'> | null
+  stores: StoreSummary[]
+  activeStore: StoreSummary | null
 }
 
 export interface Product {
@@ -26,6 +32,8 @@ export interface Product {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  storeId?: number
+  storeName?: string
 }
 
 export interface Sale {
@@ -79,6 +87,8 @@ export interface RecentSale {
   revenue: number
   soldAt: string
   lines: RecentSaleLine[]
+  storeId?: number
+  storeName?: string
 }
 
 export interface RecentSaleLine {
@@ -180,4 +190,5 @@ export interface ImportPreview {
   toCreate: number
   toUpdate: number
   rows: ImportPreviewRow[]
+  destinationStore: StoreSummary
 }

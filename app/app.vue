@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { session } = useSession()
+
 // titleTemplate needs a function, which nuxt.config's serializable app.head
 // can't carry (see the comment there) - set once here instead.
 useHead({
@@ -8,7 +10,10 @@ useHead({
 
 <template>
   <NuxtLayout>
-    <NuxtPage />
+    <!-- Store-scoped pages use a mix of useFetch and imperative loaders. A
+         store change must remount the current page so both styles reload
+         against the newly selected store without a browser refresh. -->
+    <NuxtPage :key="session?.activeStore?.id ?? 'anonymous'" />
   </NuxtLayout>
   <AppSplash />
   <!-- @vite-pwa/nuxt only auto-registers this component; it never renders it

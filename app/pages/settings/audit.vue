@@ -12,6 +12,7 @@ interface AuditEntry {
   createdAt: string
   username: string
   displayName: string
+  storeName: string | null
 }
 
 const { data: entries, status } = await useFetch<AuditEntry[]>('/api/audit')
@@ -37,6 +38,7 @@ function formatTime(value: string) {
               <p class="mt-1 text-sm font-semibold text-brand-700" data-testid="audit-actor">
                 {{ entry.displayName }} <span class="font-normal text-ink-subtle">@{{ entry.username }}</span>
               </p>
+              <p v-if="entry.storeName" class="mt-1 text-xs text-ink-subtle">{{ entry.storeName }}</p>
             </div>
             <AppBadge tone="neutral">{{ entry.action }}</AppBadge>
           </div>

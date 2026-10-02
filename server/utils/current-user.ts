@@ -8,6 +8,8 @@ export interface SessionUser {
   displayName: string
   role: UserRole
   mustChangePassword: boolean
+  stores: SessionStore[]
+  activeStore: SessionStore | null
 }
 
 export async function resolveSessionUser(event: H3Event): Promise<SessionUser | null> {
@@ -34,8 +36,12 @@ export async function resolveSessionUser(event: H3Event): Promise<SessionUser | 
   // already be dead.
   if (user.sessionEpoch !== token.epoch) return null
 
+  const accessibleStores = await listAccessibleStores(user.id, user.role)
+  const activeStore = token.storeId === null
+    ? await resolveDefaultStore(user.id, accessibleStores)
+    : accessibleStores.find((store) => store.id === token.storeId) ?? null
   const { sessionEpoch: _sessionEpoch, ...sessionUser } = user
-  return sessionUser
+  return { ...sessionUser, stores: accessibleStores, activeStore }
 }
 
 export function requireUser(event: H3Event): SessionUser {

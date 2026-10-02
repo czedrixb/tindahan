@@ -34,7 +34,7 @@ test('inventory and sales can be exported to Excel', async ({ page }) => {
     page.waitForEvent('download'),
     page.getByText('Export Current Inventory').click(),
   ])
-  expect(inventoryDownload.suggestedFilename()).toMatch(/^inventory-.*\.xlsx$/)
+  expect(inventoryDownload.suggestedFilename()).toMatch(/^davao-inventory-.*\.xlsx$/)
   const inventoryPath = await inventoryDownload.path()
   expect(inventoryPath).not.toBeNull()
   expect(fs.statSync(inventoryPath!).size).toBeGreaterThan(0)
@@ -44,7 +44,7 @@ test('inventory and sales can be exported to Excel', async ({ page }) => {
     page.waitForEvent('download'),
     page.getByRole('link', { name: 'Export' }).click(),
   ])
-  expect(salesDownload.suggestedFilename()).toMatch(/^sales-.*\.xlsx$/)
+  expect(salesDownload.suggestedFilename()).toMatch(/^davao-sales-.*\.xlsx$/)
   const salesPath = await salesDownload.path()
   expect(salesPath).not.toBeNull()
   expect(fs.statSync(salesPath!).size).toBeGreaterThan(0)

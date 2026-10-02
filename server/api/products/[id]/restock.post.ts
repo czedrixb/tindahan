@@ -9,11 +9,12 @@ export default defineEventHandler(async (event) => {
   const productId = parseIdParam(event)
   const { quantity, reason } = await readValidated(event, restockSchema)
   const db = useDb()
-  requireUser(event)
+  const { store } = requireStoreAccess(event)
 
   const result = await db.transaction(async (tx) => {
     return applyStockChange(tx, {
       productId,
+      storeId: store.id,
       delta: quantity,
       type: 'RESTOCK',
       reason: reason ?? 'New stock',

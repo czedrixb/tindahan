@@ -1,9 +1,10 @@
-import { and, asc, ilike, isNull, or, sql } from 'drizzle-orm'
-import { products } from '../../db/schema'
+import { and, asc, eq, ilike, isNull, or, sql } from 'drizzle-orm'
+import { products, storeProducts } from '../../db/schema'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const db = useDb()
+  const { store } = requireStoreAccess(event)
 
   const conditions = []
 
@@ -20,20 +21,27 @@ export default defineEventHandler(async (event) => {
     )
   }
 
-  if (query.active === 'true') conditions.push(sql`${products.isActive} = true`)
-  if (query.active === 'false') conditions.push(sql`${products.isActive} = false`)
+  conditions.push(eq(storeProducts.storeId, store.id))
+  if (query.active === 'true') conditions.push(sql`${storeProducts.isActive} = true`)
+  if (query.active === 'false') conditions.push(sql`${storeProducts.isActive} = false`)
 
   if (query.lowStock === 'true') {
-    conditions.push(sql`${products.stock} <= ${products.lowStockThreshold}`)
+    conditions.push(sql`${storeProducts.stock} <= ${storeProducts.lowStockThreshold}`)
   }
 
   if (query.needsPricing === 'true') {
-    conditions.push(or(isNull(products.costPrice), isNull(products.sellingPrice)))
+    conditions.push(or(isNull(storeProducts.costPrice), isNull(storeProducts.sellingPrice)))
   }
 
   const rows = await db
-    .select()
+    .select({
+      id: products.id, name: products.name, variant: products.variant,
+      costPrice: storeProducts.costPrice, sellingPrice: storeProducts.sellingPrice,
+      stock: storeProducts.stock, lowStockThreshold: storeProducts.lowStockThreshold,
+      isActive: storeProducts.isActive, createdAt: products.createdAt, updatedAt: storeProducts.updatedAt,
+    })
     .from(products)
+    .innerJoin(storeProducts, eq(storeProducts.productId, products.id))
     .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(asc(products.name), asc(products.variant))
 

@@ -16,6 +16,7 @@ useHead({ title: () => props.title })
       <div class="min-w-0">
         <h1 class="text-lg font-bold text-ink">{{ title }}</h1>
         <p v-if="subtitle" class="text-sm text-ink-subtle">{{ subtitle }}</p>
+        <StoreSwitcher compact class="mt-1 lg:hidden" />
       </div>
       <slot name="actions" />
     </div>

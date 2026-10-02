@@ -43,6 +43,7 @@ const initials = computed(() => {
       <BrandMark :size="28" />
       <span class="text-sm font-bold tracking-tight text-ink">Tindahan</span>
     </div>
+    <div class="px-5 pb-4"><StoreSwitcher /></div>
 
     <nav class="flex-1 space-y-0.5 px-3" aria-label="Primary">
       <NuxtLink

@@ -14,7 +14,12 @@ const error = ref('')
 const busy = ref(false)
 
 const showAddForm = ref(false)
-const form = reactive({ displayName: '', username: '', password: '', role: 'MEMBER' as UserRole })
+const stores = computed(() => session.value?.stores ?? [])
+const form = reactive({
+  displayName: '', username: '', password: '', role: 'MEMBER' as UserRole,
+  storeIds: [session.value?.activeStore?.id ?? 1] as number[],
+  defaultStoreId: session.value?.activeStore?.id ?? 1,
+})
 
 const openId = ref<number | null>(null)
 const resetOpenId = ref<number | null>(null)
@@ -64,13 +69,21 @@ async function run(fn: () => Promise<unknown>, ok: string) {
 function createUser() {
   return run(async () => {
     await $fetch('/api/users', { method: 'POST', body: { ...form } })
-    Object.assign(form, { displayName: '', username: '', password: '', role: 'MEMBER' })
+    Object.assign(form, { displayName: '', username: '', password: '', role: 'MEMBER', storeIds: [session.value?.activeStore?.id ?? 1], defaultStoreId: session.value?.activeStore?.id ?? 1 })
     showAddForm.value = false
   }, 'Account created. Share the temporary password with them.')
 }
 
 function setRole(u: StoreUser, role: UserRole) {
   return run(() => $fetch(`/api/users/${u.id}`, { method: 'PATCH', body: { role } }), 'Role updated.')
+}
+
+function saveStores(u: StoreUser) {
+  if (!u.storeIds.includes(u.defaultStoreId ?? 0)) u.defaultStoreId = u.storeIds[0] ?? null
+  return run(
+    () => $fetch(`/api/users/${u.id}`, { method: 'PATCH', body: { storeIds: u.storeIds, defaultStoreId: u.defaultStoreId } }),
+    'Store access updated. The account must sign in again.',
+  )
 }
 
 async function demote(u: StoreUser) {
@@ -180,11 +193,20 @@ function submitEdit(u: StoreUser) {
               <option value="ADMIN">Admin</option>
             </select>
           </AppField>
+          <fieldset class="space-y-2">
+            <legend class="text-sm font-medium text-ink">Store access</legend>
+            <label v-for="store in stores" :key="store.id" class="flex items-center gap-2 text-sm text-ink-muted">
+              <input v-model="form.storeIds" type="checkbox" :value="store.id" /> {{ store.name }}
+            </label>
+            <select v-model.number="form.defaultStoreId" class="field-input text-sm" aria-label="Default store">
+              <option v-for="store in stores.filter((item) => form.storeIds.includes(item.id))" :key="store.id" :value="store.id">Default: {{ store.name }}</option>
+            </select>
+          </fieldset>
           <AppButton
             block
             size="sm"
             :loading="busy"
-            :disabled="busy || !form.displayName || !form.username || form.password.length < PASSWORD_MIN_LENGTH"
+            :disabled="busy || !form.displayName || !form.username || form.password.length < PASSWORD_MIN_LENGTH || !form.storeIds.length"
             data-testid="create-user"
             @click="createUser"
           >
@@ -215,6 +237,16 @@ function submitEdit(u: StoreUser) {
             </button>
 
             <div v-if="openId === u.id" class="mt-3 space-y-2 border-t border-line pt-3">
+              <fieldset class="space-y-2 rounded-[var(--radius-control)] bg-surface-sunken p-3">
+                <legend class="px-1 text-xs font-semibold text-ink-muted">Store access</legend>
+                <label v-for="store in stores" :key="store.id" class="flex items-center gap-2 text-sm text-ink-muted">
+                  <input v-model="u.storeIds" type="checkbox" :value="store.id" /> {{ store.name }}
+                </label>
+                <select v-model.number="u.defaultStoreId" class="field-input text-sm" aria-label="Default store">
+                  <option v-for="store in stores.filter((item) => u.storeIds.includes(item.id))" :key="store.id" :value="store.id">Default: {{ store.name }}</option>
+                </select>
+                <AppButton block size="sm" variant="secondary" :disabled="busy || !u.storeIds.length" @click="saveStores(u)">Save Store Access</AppButton>
+              </fieldset>
               <AppButton variant="secondary" block size="sm" data-testid="user-edit-toggle" :disabled="busy" @click="toggleEdit(u)">
                 Edit Account
               </AppButton>

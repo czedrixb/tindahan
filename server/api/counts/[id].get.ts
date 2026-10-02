@@ -1,11 +1,12 @@
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { inventoryCountItems, inventoryCounts, products } from '../../db/schema'
 
 export default defineEventHandler(async (event) => {
   const id = parseIdParam(event)
   const db = useDb()
+  const { store } = requireStoreAccess(event)
 
-  const [count] = await db.select().from(inventoryCounts).where(eq(inventoryCounts.id, id))
+  const [count] = await db.select().from(inventoryCounts).where(and(eq(inventoryCounts.id, id), eq(inventoryCounts.storeId, store.id)))
   if (!count) throw createError({ statusCode: 404, statusMessage: 'Inventory count not found' })
 
   const items = await db
@@ -20,7 +21,7 @@ export default defineEventHandler(async (event) => {
     })
     .from(inventoryCountItems)
     .innerJoin(products, eq(products.id, inventoryCountItems.productId))
-    .where(eq(inventoryCountItems.inventoryCountId, id))
+    .where(and(eq(inventoryCountItems.inventoryCountId, id), eq(inventoryCountItems.storeId, store.id)))
     .orderBy(asc(products.name), asc(products.variant))
 
   return { ...count, items }

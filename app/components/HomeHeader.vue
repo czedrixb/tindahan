@@ -43,6 +43,7 @@ const initials = computed(() => {
         </span>
       </div>
     </div>
+    <StoreSwitcher compact class="mt-3 lg:hidden" />
 
     <h1 class="mt-5 text-2xl font-bold leading-tight text-ink lg:mt-0">{{ title }}</h1>
     <p v-if="subtitle" class="mt-1 text-sm text-ink-subtle">{{ subtitle }}</p>

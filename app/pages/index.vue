@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import type { DashboardSummary } from '~/types'
 
-const { data, refresh, pending, error } = useLazyFetch<DashboardSummary>('/api/dashboard/today')
+const { session } = useSession()
+const reportStore = ref<string>(String(session.value?.activeStore?.id ?? ''))
+const { data, refresh, pending, error } = useLazyFetch<DashboardSummary>('/api/dashboard/today', {
+  query: computed(() => ({ store: reportStore.value || undefined })),
+})
 
 const lowStock = computed(() => data.value?.lowStock ?? [])
 const recentSales = computed(() => data.value?.recentSales ?? [])
@@ -14,6 +18,15 @@ const recentSalesPager = usePagination(recentSales, 5)
     <HomeHeader title="Today" :subtitle="data ? formatDateLabel(data.date) : undefined" />
 
     <div class="page-shell space-y-6">
+      <div class="flex justify-end">
+        <label class="flex items-center gap-2 text-sm text-ink-muted">
+          <span>Show</span>
+          <select v-model="reportStore" data-testid="dashboard-store-filter" class="field-input min-h-10 py-1.5 text-sm font-semibold">
+            <option v-for="store in session?.stores" :key="store.id" :value="String(store.id)">{{ store.name }}</option>
+            <option v-if="session?.user?.role === 'ADMIN'" value="all">All stores</option>
+          </select>
+        </label>
+      </div>
       <AppSkeleton v-if="pending && !data" variant="stat-grid" />
 
       <div v-else-if="error" class="space-y-3 rounded-[var(--radius-card)] border border-danger-200 bg-danger-50 p-4 text-sm text-danger-600">
@@ -49,6 +62,7 @@ const recentSalesPager = usePagination(recentSales, 5)
               >
                 <div>
                   <p class="font-medium text-ink">{{ formatProductText(p.name) }}<span v-if="p.variant" class="text-ink-subtle"> · {{ formatProductText(p.variant) }}</span></p>
+                  <p v-if="reportStore === 'all'" class="text-xs font-medium text-brand-700">{{ p.storeName }}</p>
                   <p class="text-xs"><span class="font-semibold text-warn-700">{{ p.stock }}</span> <span class="text-ink-subtle">remaining</span></p>
                 </div>
                 <NuxtLink :to="`/products/${p.id}`" class="press focus-ring rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-ink">
@@ -77,7 +91,7 @@ const recentSalesPager = usePagination(recentSales, 5)
                   <span class="shrink-0 font-medium tabular-nums text-ink-muted">×{{ line.quantity }}</span>
                 </div>
                 <div class="mt-1.5 flex items-center justify-between border-t border-line pt-1.5">
-                  <span class="text-xs text-ink-subtle">{{ formatTimeLabel(sale.soldAt) }}</span>
+                  <span class="text-xs text-ink-subtle">{{ reportStore === 'all' ? `${sale.storeName} - ` : '' }}{{ formatTimeLabel(sale.soldAt) }}</span>
                   <span class="font-semibold tabular-nums text-ink">{{ formatPeso(sale.revenue) }}</span>
                 </div>
               </li>

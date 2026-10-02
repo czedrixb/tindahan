@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { products, sales, saleTransactions } from '../../db/schema'
+import { products, storeProducts, sales, saleTransactions } from '../../db/schema'
 
 const cartItemSchema = z.object({
   productId: z.number().int().positive(),
@@ -17,11 +17,11 @@ const createSaleSchema = z
     message: 'Duplicate product in cart',
   })
 
-async function findBySubmissionKey(db: ReturnType<typeof useDb>, submissionKey: string) {
+async function findBySubmissionKey(db: ReturnType<typeof useDb>, storeId: number, submissionKey: string) {
   const [transaction] = await db
     .select()
     .from(saleTransactions)
-    .where(eq(saleTransactions.submissionKey, submissionKey))
+    .where(and(eq(saleTransactions.storeId, storeId), eq(saleTransactions.submissionKey, submissionKey)))
 
   if (!transaction) return null
 
@@ -45,11 +45,11 @@ async function findBySubmissionKey(db: ReturnType<typeof useDb>, submissionKey: 
 export default defineEventHandler(async (event) => {
   const { items, cashReceived, submissionKey } = await readValidated(event, createSaleSchema)
   const db = useDb()
-  const user = requireUser(event)
+  const { user, store } = requireStoreAccess(event)
 
   // Replay of a request we already recorded (e.g. a retried submission) —
   // return the original receipt instead of recording a duplicate.
-  const replayed = await findBySubmissionKey(db, submissionKey)
+  const replayed = await findBySubmissionKey(db, store.id, submissionKey)
   if (replayed) return replayed
 
   // Lock products in a consistent order so two carts sharing products can't deadlock on FOR UPDATE.
@@ -71,7 +71,13 @@ export default defineEventHandler(async (event) => {
       }[] = []
 
       for (const item of orderedItems) {
-        const [product] = await tx.select().from(products).where(eq(products.id, item.productId))
+        const [product] = await tx.select({
+          id: products.id, name: products.name, variant: products.variant,
+          isActive: storeProducts.isActive, costPrice: storeProducts.costPrice,
+          sellingPrice: storeProducts.sellingPrice,
+        }).from(products).innerJoin(storeProducts, eq(storeProducts.productId, products.id)).where(and(
+          eq(products.id, item.productId), eq(storeProducts.storeId, store.id),
+        ))
         if (!product) throw createError({ statusCode: 404, statusMessage: 'Product not found' })
         if (!product.isActive) {
           throw createError({ statusCode: 400, statusMessage: 'Product is not active' })
@@ -102,6 +108,7 @@ export default defineEventHandler(async (event) => {
       const [transaction] = await tx
         .insert(saleTransactions)
         .values({
+          storeId: store.id,
           submissionKey,
           cashReceived,
           changeDue: cashReceived - revenue,
@@ -127,6 +134,7 @@ export default defineEventHandler(async (event) => {
 
         const { previousStock, newStock } = await applyStockChange(tx, {
           productId: line.productId,
+          storeId: store.id,
           delta: -line.quantity,
           type: 'SALE',
           saleId: created.id,
@@ -153,6 +161,7 @@ export default defineEventHandler(async (event) => {
         entityType: 'SALE',
         entityId: transaction.id,
         description,
+        storeId: store.id,
       })
 
       return { ...transaction, lines: createdLines }
@@ -163,7 +172,7 @@ export default defineEventHandler(async (event) => {
     // Concurrent retry raced us to the same submission key — return the
     // receipt the other request recorded rather than surfacing a DB error.
     if (isUniqueViolation(err)) {
-      const raced = await findBySubmissionKey(db, submissionKey)
+      const raced = await findBySubmissionKey(db, store.id, submissionKey)
       if (raced) return raced
     }
     throw err

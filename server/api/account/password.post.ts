@@ -41,7 +41,8 @@ export default defineEventHandler(async (event) => {
   // bump above kills the cookie this very request arrived with, so
   // immediately re-issue one carrying the new epoch.
   const config = useRuntimeConfig()
-  const token = createSessionToken(config.sessionSecret, actor.id, updated.sessionEpoch)
+  if (!actor.activeStore) throw createError({ statusCode: 403, statusMessage: 'No store access' })
+  const token = createSessionToken(config.sessionSecret, actor.id, updated.sessionEpoch, actor.activeStore.id)
   const isHttps = getRequestURL(event).protocol === 'https:'
   setCookie(event, SESSION_COOKIE_NAME, token, {
     httpOnly: true,

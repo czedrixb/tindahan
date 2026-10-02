@@ -1,13 +1,15 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { sales, saleTransactions } from '../../db/schema'
 
 export default defineEventHandler(async (event) => {
   const id = parseIdParam(event)
   const db = useDb()
-  const user = requireUser(event)
+  const { user, store } = requireStoreAccess(event)
 
   const result = await db.transaction(async (tx) => {
-    const [transaction] = await tx.select().from(saleTransactions).where(eq(saleTransactions.id, id))
+    const [transaction] = await tx.select().from(saleTransactions).where(and(
+      eq(saleTransactions.id, id), eq(saleTransactions.storeId, store.id),
+    ))
     if (!transaction) throw createError({ statusCode: 404, statusMessage: 'Sale not found' })
     if (transaction.voidedAt) throw createError({ statusCode: 400, statusMessage: 'Sale is already voided' })
 
@@ -18,6 +20,7 @@ export default defineEventHandler(async (event) => {
     for (const line of lines) {
       await applyStockChange(tx, {
         productId: line.productId,
+        storeId: transaction.storeId,
         delta: line.quantity,
         type: 'ADJUSTMENT',
         reason: `Voided sale #${id}`,
@@ -32,6 +35,7 @@ export default defineEventHandler(async (event) => {
       entityType: 'SALE',
       entityId: id,
       description: `Voided sale #${id} and restored ${itemCount} item${itemCount === 1 ? '' : 's'}`,
+      storeId: transaction.storeId,
     })
 
     return { ...transaction, voidedAt: new Date() }

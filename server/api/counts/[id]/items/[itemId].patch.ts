@@ -15,10 +15,12 @@ export default defineEventHandler(async (event) => {
 
   const { actualQuantity } = await readValidated(event, patchSchema)
   const db = useDb()
-  requireUser(event)
+  const { store } = requireStoreAccess(event)
 
   return db.transaction(async (tx) => {
-    const [count] = await tx.select().from(inventoryCounts).where(eq(inventoryCounts.id, countId))
+    const [count] = await tx.select().from(inventoryCounts).where(and(
+      eq(inventoryCounts.id, countId), eq(inventoryCounts.storeId, store.id),
+    ))
     if (!count) throw createError({ statusCode: 404, statusMessage: 'Inventory count not found' })
     if (count.status !== 'IN_PROGRESS') {
       throw createError({ statusCode: 400, statusMessage: 'Inventory count is already completed' })
@@ -27,7 +29,7 @@ export default defineEventHandler(async (event) => {
     const [item] = await tx
       .select()
       .from(inventoryCountItems)
-      .where(and(eq(inventoryCountItems.id, itemId), eq(inventoryCountItems.inventoryCountId, countId)))
+      .where(and(eq(inventoryCountItems.id, itemId), eq(inventoryCountItems.inventoryCountId, countId), eq(inventoryCountItems.storeId, store.id)))
     if (!item) throw createError({ statusCode: 404, statusMessage: 'Count item not found' })
 
     const [updated] = await tx

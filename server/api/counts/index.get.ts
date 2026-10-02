@@ -1,7 +1,8 @@
-import { desc } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { inventoryCounts } from '../../db/schema'
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
   const db = useDb()
-  return db.select().from(inventoryCounts).orderBy(desc(inventoryCounts.countDate))
+  const { store } = requireStoreAccess(event)
+  return db.select().from(inventoryCounts).where(eq(inventoryCounts.storeId, store.id)).orderBy(desc(inventoryCounts.countDate))
 })

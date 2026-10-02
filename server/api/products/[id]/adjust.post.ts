@@ -15,10 +15,10 @@ export default defineEventHandler(async (event) => {
   const productId = parseIdParam(event)
   const { type, delta, reason } = await readValidated(event, adjustSchema)
   const db = useDb()
-  requireUser(event)
+  const { store } = requireStoreAccess(event)
 
   const result = await db.transaction(async (tx) => {
-    return applyStockChange(tx, { productId, delta, type, reason })
+    return applyStockChange(tx, { productId, storeId: store.id, delta, type, reason })
   })
 
   return result

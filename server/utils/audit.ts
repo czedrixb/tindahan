@@ -11,6 +11,7 @@ export interface AuditInput {
   entityType: string
   entityId?: number | string | null
   description: string
+  storeId?: number | null
 }
 
 export async function recordAudit(db: AuditDb, input: AuditInput) {
@@ -20,5 +21,6 @@ export async function recordAudit(db: AuditDb, input: AuditInput) {
     entityType: input.entityType,
     entityId: input.entityId === undefined || input.entityId === null ? null : String(input.entityId),
     description: input.description,
+    storeId: input.storeId ?? null,
   })
 }
