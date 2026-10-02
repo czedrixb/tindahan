@@ -25,6 +25,8 @@ export interface SessionTokenPayload {
   userId: number
   /** Must match users.session_epoch for the token to still be valid. */
   epoch: number
+  /** Missing only on cookies issued before multi-store support. */
+  storeId: number | null
 }
 
 /**
@@ -33,9 +35,9 @@ export interface SessionTokenPayload {
  * cookies - bump users.session_epoch and every token minted before that
  * bump stops verifying.
  */
-export function createSessionToken(secret: string, userId: number, epoch: number): string {
+export function createSessionToken(secret: string, userId: number, epoch: number, storeId: number): string {
   const expires = Date.now() + SESSION_TTL_MS
-  const payload = `auth.${userId}.${epoch}.${expires}`
+  const payload = `auth.${userId}.${epoch}.${storeId}.${expires}`
   const signature = createHmac('sha256', secret).update(payload).digest('hex')
   return `${payload}.${signature}`
 }
@@ -47,16 +49,23 @@ export function verifySessionToken(token: string | undefined | null, secret: str
   // segment - treat them as epoch 0 so nobody already signed in is logged
   // out by this deploy; they naturally roll onto real epochs at next login.
   const isLegacy = parts.length === 4
-  if (!isLegacy && parts.length !== 5) return null
+  const isPreStore = parts.length === 5
+  if (!isLegacy && !isPreStore && parts.length !== 6) return null
 
-  const [tag, userIdRaw, epochOrExpiresRaw, expiresOrSignatureRaw, maybeSignature] = parts
+  const [tag, userIdRaw, epochOrExpiresRaw, storeOrExpiresRaw, expiresOrSignatureRaw, maybeSignature] = parts
   if (tag !== 'auth') return null
 
   const epochRaw = isLegacy ? '0' : epochOrExpiresRaw
-  const expiresRaw = isLegacy ? epochOrExpiresRaw : expiresOrSignatureRaw
-  const signature = isLegacy ? expiresOrSignatureRaw : maybeSignature
+  const storeIdRaw = isLegacy || isPreStore ? null : storeOrExpiresRaw
+  const expiresRaw = isLegacy ? epochOrExpiresRaw : isPreStore ? storeOrExpiresRaw : expiresOrSignatureRaw
+  const signature = isLegacy ? storeOrExpiresRaw : isPreStore ? expiresOrSignatureRaw : maybeSignature
+  if (!signature) return null
 
-  const payload = isLegacy ? `${tag}.${userIdRaw}.${expiresRaw}` : `${tag}.${userIdRaw}.${epochRaw}.${expiresRaw}`
+  const payload = isLegacy
+    ? `${tag}.${userIdRaw}.${expiresRaw}`
+    : isPreStore
+      ? `${tag}.${userIdRaw}.${epochRaw}.${expiresRaw}`
+      : `${tag}.${userIdRaw}.${epochRaw}.${storeIdRaw}.${expiresRaw}`
   const expectedSignature = createHmac('sha256', secret).update(payload).digest('hex')
   const expectedBuf = Buffer.from(expectedSignature, 'hex')
   const actualBuf = Buffer.from(signature, 'hex')
@@ -66,12 +75,14 @@ export function verifySessionToken(token: string | undefined | null, secret: str
 
   const userId = Number(userIdRaw)
   const epoch = Number(epochRaw)
+  const storeId = storeIdRaw === null ? null : Number(storeIdRaw)
   const expires = Number(expiresRaw)
   if (!Number.isInteger(userId) || userId <= 0) return null
   if (!Number.isInteger(epoch) || epoch < 0) return null
+  if (storeId !== null && (!Number.isInteger(storeId) || storeId <= 0)) return null
   if (!Number.isFinite(expires) || Date.now() >= expires) return null
 
-  return { userId, epoch }
+  return { userId, epoch, storeId }
 }
 
 // Kept for the existing CLI while deployments move from STORE_PIN_HASH.

@@ -1,5 +1,5 @@
 import { desc, eq } from 'drizzle-orm'
-import { auditLogs, users } from '../../db/schema'
+import { auditLogs, stores, users } from '../../db/schema'
 
 export default defineEventHandler(async (event) => {
   requireAdmin(event)
@@ -18,9 +18,11 @@ export default defineEventHandler(async (event) => {
       userId: users.id,
       username: users.username,
       displayName: users.displayName,
+      storeName: stores.name,
     })
     .from(auditLogs)
     .innerJoin(users, eq(users.id, auditLogs.userId))
+    .leftJoin(stores, eq(stores.id, auditLogs.storeId))
     .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
     .limit(limit)
 })

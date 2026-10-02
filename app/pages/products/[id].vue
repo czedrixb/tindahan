@@ -5,6 +5,8 @@ const route = useRoute()
 const id = Number(route.params.id)
 const toast = useToast()
 const { confirm } = useConfirm()
+const { session } = useSession()
+const isAdmin = computed(() => session.value?.user?.role === 'ADMIN')
 
 const { data: product, refresh } = await useFetch<Product>(`/api/products/${id}`)
 
@@ -34,8 +36,7 @@ async function saveDetails() {
     await $fetch(`/api/products/${id}`, {
       method: 'PATCH',
       body: {
-        name: name.value,
-        variant: variant.value,
+        ...(isAdmin.value ? { name: name.value, variant: variant.value } : {}),
         costPrice: costPesos.value === null ? null : pesosToCentavos(costPesos.value),
         sellingPrice: sellingPesos.value === null ? null : pesosToCentavos(sellingPesos.value),
         lowStockThreshold: lowStockThreshold.value,
@@ -141,11 +142,12 @@ async function deactivate() {
         <h2 class="mb-3 text-sm font-semibold text-ink-muted">Details</h2>
         <div class="space-y-3">
           <AppField label="Product Name" for="detail-name">
-            <input id="detail-name" v-model="name" type="text" class="field-input" />
+            <input id="detail-name" v-model="name" type="text" class="field-input disabled:bg-surface-sunken" :disabled="!isAdmin" />
           </AppField>
           <AppField label="Variant" for="detail-variant">
-            <input id="detail-variant" v-model="variant" type="text" class="field-input" />
+            <input id="detail-variant" v-model="variant" type="text" class="field-input disabled:bg-surface-sunken" :disabled="!isAdmin" />
           </AppField>
+          <p v-if="!isAdmin" class="text-xs text-ink-subtle">Product names are shared across stores and can be changed by an admin.</p>
           <div class="grid grid-cols-2 gap-3">
             <AppField label="Cost Price (₱)" for="detail-cost">
               <input id="detail-cost" v-model.number="costPesos" type="number" min="0" step="0.01" class="field-input" />

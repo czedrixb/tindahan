@@ -18,7 +18,10 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: 'Incorrect username or password' })
   }
 
-  const token = createSessionToken(config.sessionSecret, user.id, user.sessionEpoch)
+  const availableStores = await listAccessibleStores(user.id, user.role)
+  const activeStore = await resolveDefaultStore(user.id, availableStores)
+  if (!activeStore) throw createError({ statusCode: 403, statusMessage: 'No store access assigned' })
+  const token = createSessionToken(config.sessionSecret, user.id, user.sessionEpoch, activeStore.id)
   const isHttps = getRequestURL(event).protocol === 'https:'
   setCookie(event, SESSION_COOKIE_NAME, token, {
     httpOnly: true,
@@ -37,5 +40,7 @@ export default defineEventHandler(async (event) => {
       role: user.role,
       mustChangePassword: user.mustChangePassword,
     },
+    stores: availableStores,
+    activeStore,
   }
 })

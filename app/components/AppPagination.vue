@@ -45,7 +45,7 @@ const pages = computed<(number | 'ellipsis')[]>(() => {
 
     <div class="flex items-center gap-1">
       <template v-for="(item, index) in pages" :key="`${item}-${index}`">
-        <span v-if="item === 'ellipsis'" class="px-1 text-sm text-ink-subtle" aria-hidden="true">â€¦</span>
+        <span v-if="item === 'ellipsis'" class="px-1 text-sm text-ink-subtle" aria-hidden="true">...</span>
         <button
           v-else
           type="button"

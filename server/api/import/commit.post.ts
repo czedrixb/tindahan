@@ -1,136 +1,84 @@
-import { inArray, sql } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { inventoryTransactions, products } from '../../db/schema'
+import { inventoryTransactions, products, storeProducts } from '../../db/schema'
 
 const commitSchema = z.object({
   importStock: z.boolean().default(true),
-  rows: z
-    .array(
-      z.object({
-        name: z.string(),
-        variant: z.string().default(''),
-        quantity: z.number().default(0),
-        costPrice: z.number().int().min(0).nullable().optional(),
-        sellingPrice: z.number().int().min(0).nullable().optional(),
-      }),
-    )
-    .min(1),
+  rows: z.array(z.object({
+    name: z.string(), variant: z.string().default(''), quantity: z.number().default(0),
+    costPrice: z.number().int().min(0).nullable().optional(),
+    sellingPrice: z.number().int().min(0).nullable().optional(),
+  })).min(1),
 })
 
-/**
- * Imports run against Supabase over the network, so per-row round trips (the
- * naive select-then-write-then-write-again loop) make a few hundred rows take
- * minutes. Everything here is batched into a handful of bulk statements
- * instead, regardless of row count.
- */
+const productKey = (name: string, variant: string) => `${name.trim().toLowerCase()}|${variant.trim().toLowerCase()}`
+
 export default defineEventHandler(async (event) => {
   const { rows: inputRows, importStock } = await readValidated(event, commitSchema)
+  const { store } = requireStoreAccess(event)
   const db = useDb()
-  requireUser(event)
+  const rows = inputRows.map((row) => ({
+    name: row.name.trim(), variant: (row.variant ?? '').trim(),
+    quantity: Math.max(0, Number.isInteger(row.quantity) ? (row.quantity ?? 0) : 0),
+    costPrice: row.costPrice ?? null, sellingPrice: row.sellingPrice ?? null,
+  })).filter((row) => row.name.length > 0)
 
-  const rows = inputRows
-    .map((row) => ({
-      name: row.name.trim(),
-      variant: row.variant.trim(),
-      quantity: Number.isInteger(row.quantity) ? row.quantity : 0,
-      costPrice: row.costPrice ?? null,
-      sellingPrice: row.sellingPrice ?? null,
-    }))
-    .filter((row) => row.name.length > 0)
-
-  const skipped = inputRows.length - rows.length
   let created = 0
   let updated = 0
-
   await db.transaction(async (tx) => {
-    const existing = await tx
-      .select({ id: products.id, name: products.name, variant: products.variant, stock: products.stock })
-      .from(products)
-    const existingMap = new Map(existing.map((p) => [`${p.name.toLowerCase()}|${p.variant.toLowerCase()}`, p]))
-
-    const toCreate: typeof rows = []
-    const toUpdate: { id: number; previousStock: number; row: (typeof rows)[number] }[] = []
+    const catalogRows = await tx.select().from(products)
+    const listingRows = await tx.select().from(storeProducts).where(eq(storeProducts.storeId, store.id))
+    const catalog = new Map(catalogRows.map((row) => [productKey(row.name, row.variant), row]))
+    const listings = new Map(listingRows.map((row) => [row.productId, row]))
 
     for (const row of rows) {
-      const match = existingMap.get(`${row.name.toLowerCase()}|${row.variant.toLowerCase()}`)
-      if (match) toUpdate.push({ id: match.id, previousStock: match.stock, row })
-      else toCreate.push(row)
-    }
-
-    if (toCreate.length) {
-      const createdRows = await tx
-        .insert(products)
-        .values(
-          toCreate.map((row) => ({
-            name: row.name,
-            variant: row.variant,
-            costPrice: row.costPrice,
-            sellingPrice: row.sellingPrice,
-            stock: importStock ? Math.max(row.quantity, 0) : 0,
-            // Product-only imports stay out of low-stock alerts until their
-            // stock count is entered.
-            lowStockThreshold: importStock ? 5 : -1,
-          })),
-        )
-        .returning({ id: products.id })
-      created = createdRows.length
-
-      const restocks = importStock
-        ? createdRows
-            .map((p, i) => ({ id: p.id, quantity: toCreate[i].quantity }))
-            .filter((r) => r.quantity > 0)
-            .map((r) => ({
-              productId: r.id,
-              type: 'RESTOCK' as const,
-              quantity: r.quantity,
-              previousStock: 0,
-              newStock: r.quantity,
-              reason: 'Excel import (initial stock)',
-            }))
-        : []
-      if (restocks.length) await tx.insert(inventoryTransactions).values(restocks)
-    }
-
-    if (toUpdate.length) {
-      updated = toUpdate.length
-      const ids = toUpdate.map((u) => u.id)
-
-      const costCases = toUpdate
-        .filter((u) => u.row.costPrice !== null)
-        .map((u) => sql`when ${u.id} then ${u.row.costPrice}`)
-      const sellingCases = toUpdate
-        .filter((u) => u.row.sellingPrice !== null)
-        .map((u) => sql`when ${u.id} then ${u.row.sellingPrice}`)
-      const stockChanges = importStock ? toUpdate.filter((u) => u.row.quantity !== u.previousStock) : []
-      const stockCases = stockChanges.map((u) => sql`when ${u.id} then ${u.row.quantity}`)
-
-      const setValues: Record<string, unknown> = { updatedAt: new Date() }
-      if (costCases.length) {
-        setValues.costPrice = sql`case ${products.id} ${sql.join(costCases, sql` `)} else ${products.costPrice} end`
-      }
-      if (sellingCases.length) {
-        setValues.sellingPrice = sql`case ${products.id} ${sql.join(sellingCases, sql` `)} else ${products.sellingPrice} end`
-      }
-      if (stockCases.length) {
-        setValues.stock = sql`case ${products.id} ${sql.join(stockCases, sql` `)} else ${products.stock} end`
+      let product = catalog.get(productKey(row.name, row.variant))
+      if (!product) {
+        ;[product] = await tx.insert(products).values({
+          name: row.name, variant: row.variant,
+          costPrice: store.id === 1 ? row.costPrice : null,
+          sellingPrice: store.id === 1 ? row.sellingPrice : null,
+          stock: store.id === 1 && importStock ? row.quantity : 0,
+          lowStockThreshold: store.id === 1 && importStock ? 5 : -1,
+          isActive: store.id === 1,
+        }).returning()
+        if (!product) throw createError({ statusCode: 500, statusMessage: 'Could not create product' })
+        catalog.set(productKey(row.name, row.variant), product)
       }
 
-      await tx.update(products).set(setValues).where(inArray(products.id, ids))
+      const existing = listings.get(product.id)
+      const targetStock = importStock ? row.quantity : existing?.stock ?? 0
+      const values = {
+        costPrice: row.costPrice ?? existing?.costPrice ?? null,
+        sellingPrice: row.sellingPrice ?? existing?.sellingPrice ?? null,
+        stock: targetStock,
+        lowStockThreshold: existing?.lowStockThreshold ?? (importStock ? 5 : -1),
+        isActive: true,
+        updatedAt: new Date(),
+      }
+      if (!existing) {
+        const [listing] = await tx.insert(storeProducts).values({ storeId: store.id, productId: product.id, ...values }).returning()
+        if (!listing) throw createError({ statusCode: 500, statusMessage: 'Could not create store product' })
+        listings.set(product.id, listing)
+        created += 1
+      } else {
+        await tx.update(storeProducts).set(values).where(and(eq(storeProducts.storeId, store.id), eq(storeProducts.productId, product.id)))
+        updated += 1
+      }
 
-      if (stockChanges.length) {
-        await tx.insert(inventoryTransactions).values(
-          stockChanges.map((u) => ({
-            productId: u.id,
-            type: 'ADJUSTMENT' as const,
-            quantity: u.row.quantity - u.previousStock,
-            previousStock: u.previousStock,
-            newStock: u.row.quantity,
-            reason: 'Excel import',
-          })),
-        )
+      const previousStock = existing?.stock ?? 0
+      if (importStock && targetStock !== previousStock) {
+        await tx.insert(inventoryTransactions).values({
+          storeId: store.id, productId: product.id,
+          type: existing ? 'ADJUSTMENT' : 'RESTOCK', quantity: targetStock - previousStock,
+          previousStock, newStock: targetStock,
+          reason: existing ? 'Excel import' : 'Excel import (initial stock)',
+        })
+      }
+      if (store.id === 1) {
+        await tx.update(products).set({ ...values }).where(eq(products.id, product.id))
       }
     }
   })
-
-  return { created, updated, skipped }
+  return { created, updated, skipped: inputRows.length - rows.length, store }
 })

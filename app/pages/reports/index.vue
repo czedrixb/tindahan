@@ -5,6 +5,8 @@ import type { DailySalesPoint, MonthlyReport, SalesTotals, TopProduct, WeeklyRep
 const toast = useToast()
 
 const tab = ref<'daily' | 'weekly' | 'monthly'>('daily')
+const { session } = useSession()
+const reportStore = ref<string>(String(session.value?.activeStore?.id ?? ''))
 
 const daily = ref<(SalesTotals & { date: string }) | null>(null)
 const weekly = ref<WeeklyReport | null>(null)
@@ -14,9 +16,10 @@ const loading = ref(false)
 async function load() {
   loading.value = true
   try {
-    if (tab.value === 'daily') daily.value = await $fetch('/api/reports/daily')
-    else if (tab.value === 'weekly') weekly.value = await $fetch('/api/reports/weekly')
-    else monthly.value = await $fetch('/api/reports/monthly')
+    const query = { store: reportStore.value || undefined }
+    if (tab.value === 'daily') daily.value = await $fetch('/api/reports/daily', { query })
+    else if (tab.value === 'weekly') weekly.value = await $fetch('/api/reports/weekly', { query })
+    else monthly.value = await $fetch('/api/reports/monthly', { query })
   } catch (err: unknown) {
     toast.error(apiErrorMessage(err, 'Could not load this report'))
   } finally {
@@ -29,6 +32,11 @@ watch(tab, () => {
   lowestStockPager.resetPage()
   load()
 })
+watch(reportStore, () => {
+  topProductsPager.resetPage()
+  lowestStockPager.resetPage()
+  load()
+})
 onMounted(load)
 
 const RANGE_PARAM = { daily: 'today', weekly: 'week', monthly: 'month' } as const
@@ -36,8 +44,8 @@ const exportHref = computed(() => `/api/export/sales?range=${RANGE_PARAM[tab.val
 
 const rangeLabel = computed(() => {
   if (tab.value === 'daily') return daily.value ? formatDateLabel(daily.value.date) : ''
-  if (tab.value === 'weekly') return weekly.value ? `${formatDateLabel(weekly.value.start)} – ${formatDateLabel(weekly.value.end)}` : ''
-  return monthly.value ? `${formatDateLabel(monthly.value.start)} – ${formatDateLabel(monthly.value.end)}` : ''
+  if (tab.value === 'weekly') return weekly.value ? `${formatDateLabel(weekly.value.start)} - ${formatDateLabel(weekly.value.end)}` : ''
+  return monthly.value ? `${formatDateLabel(monthly.value.start)} - ${formatDateLabel(monthly.value.end)}` : ''
 })
 
 const totals = computed<SalesTotals | null>(() => {
@@ -94,7 +102,7 @@ function dayLabel(dateKey: string) {
   <div>
     <PageHeader title="Reports">
       <template #actions>
-        <a
+        <a v-if="reportStore !== 'all'"
           :href="exportHref"
           class="press focus-ring flex min-h-11 shrink-0 touch-manipulation items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 text-sm font-semibold text-ink active:bg-neutral-50"
         >
@@ -105,6 +113,15 @@ function dayLabel(dateKey: string) {
     </PageHeader>
 
     <div class="page-shell space-y-4">
+      <div class="flex justify-end">
+        <label class="flex items-center gap-2 text-sm text-ink-muted">
+          <span>Show</span>
+          <select v-model="reportStore" data-testid="report-store-filter" class="field-input min-h-10 py-1.5 text-sm font-semibold">
+            <option v-for="store in session?.stores" :key="store.id" :value="String(store.id)">{{ store.name }}</option>
+            <option v-if="session?.user?.role === 'ADMIN'" value="all">All stores</option>
+          </select>
+        </label>
+      </div>
       <div class="flex items-center justify-between gap-3">
         <div class="flex gap-2">
           <button
@@ -195,7 +212,7 @@ function dayLabel(dateKey: string) {
           <ul class="divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface">
             <li v-for="p in lowestStockPager.pageItems.value" :key="p.id" class="flex items-center justify-between px-4 py-2.5 text-sm">
               <span>{{ formatProductText(p.name) }}<span v-if="p.variant" class="text-ink-subtle"> · {{ formatProductText(p.variant) }}</span></span>
-              <span class="font-medium tabular-nums text-ink">{{ p.stock }}</span>
+              <span class="text-right"><span v-if="reportStore === 'all'" class="mr-2 text-xs text-brand-700">{{ p.storeName }}</span><span class="font-medium tabular-nums text-ink">{{ p.stock }}</span></span>
             </li>
           </ul>
           <AppPagination

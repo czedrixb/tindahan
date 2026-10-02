@@ -4,9 +4,10 @@ import { products, sales, saleTransactions } from '../../db/schema'
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const db = useDb()
+  const { store } = requireStoreAccess(event)
 
   const range = resolveDateRangeFromQuery(query)
-  const conditions = [gte(saleTransactions.soldAt, range.start), lt(saleTransactions.soldAt, range.end)]
+  const conditions = [eq(saleTransactions.storeId, store.id), gte(saleTransactions.soldAt, range.start), lt(saleTransactions.soldAt, range.end)]
 
   if (query.includeVoided !== 'true') {
     conditions.push(isNull(saleTransactions.voidedAt))

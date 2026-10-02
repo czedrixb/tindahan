@@ -1,8 +1,12 @@
-import { and, asc, desc, eq, gte, isNull, lt, sql } from 'drizzle-orm'
-import { products, sales, saleTransactions } from '../../db/schema'
+import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm'
+import { products, storeProducts, stores, sales, saleTransactions } from '../../db/schema'
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
   const db = useDb()
+  const query = getQuery(event)
+  const scope = requireReportStore(event, query.store)
+  const storeIds = scope.mode === 'all' ? scope.stores.map((store) => store.id) : [scope.store.id]
+  const saleScope = scope.mode === 'all' ? undefined : eq(saleTransactions.storeId, scope.store.id)
   const { start, end } = storeDayRange()
 
   const totalsQuery = db
@@ -12,7 +16,7 @@ export default defineEventHandler(async () => {
       transactions: sql<number>`count(*)`,
     })
     .from(saleTransactions)
-    .where(and(gte(saleTransactions.soldAt, start), lt(saleTransactions.soldAt, end), isNull(saleTransactions.voidedAt)))
+    .where(and(saleScope, gte(saleTransactions.soldAt, start), lt(saleTransactions.soldAt, end), isNull(saleTransactions.voidedAt)))
 
   const itemTotalsQuery = db
     .select({
@@ -20,13 +24,25 @@ export default defineEventHandler(async () => {
     })
     .from(sales)
     .innerJoin(saleTransactions, eq(saleTransactions.id, sales.transactionId))
-    .where(and(gte(saleTransactions.soldAt, start), lt(saleTransactions.soldAt, end), isNull(saleTransactions.voidedAt)))
+    .where(and(saleScope, gte(saleTransactions.soldAt, start), lt(saleTransactions.soldAt, end), isNull(saleTransactions.voidedAt)))
 
   const lowStockQuery = db
-    .select()
-    .from(products)
-    .where(and(eq(products.isActive, true), sql`${products.stock} <= ${products.lowStockThreshold}`))
-    .orderBy(asc(products.stock), asc(products.name), asc(products.variant))
+    .select({
+      id: products.id, name: products.name, variant: products.variant,
+      costPrice: storeProducts.costPrice, sellingPrice: storeProducts.sellingPrice,
+      stock: storeProducts.stock, lowStockThreshold: storeProducts.lowStockThreshold,
+      isActive: storeProducts.isActive, createdAt: products.createdAt, updatedAt: storeProducts.updatedAt,
+      storeId: stores.id, storeName: stores.name,
+    })
+    .from(storeProducts)
+    .innerJoin(products, eq(products.id, storeProducts.productId))
+    .innerJoin(stores, eq(stores.id, storeProducts.storeId))
+    .where(and(
+      inArray(storeProducts.storeId, storeIds),
+      eq(storeProducts.isActive, true),
+      sql`${storeProducts.stock} <= ${storeProducts.lowStockThreshold}`,
+    ))
+    .orderBy(asc(storeProducts.stock), asc(products.name), asc(products.variant))
 
   const recentSalesQuery = db
     .select({
@@ -38,11 +54,14 @@ export default defineEventHandler(async () => {
       productName: products.name,
       productVariant: products.variant,
       quantity: sales.quantity,
+      storeId: stores.id,
+      storeName: stores.name,
     })
     .from(saleTransactions)
     .innerJoin(sales, eq(sales.transactionId, saleTransactions.id))
     .innerJoin(products, eq(products.id, sales.productId))
-    .where(and(gte(saleTransactions.soldAt, start), lt(saleTransactions.soldAt, end), isNull(saleTransactions.voidedAt)))
+    .innerJoin(stores, eq(stores.id, saleTransactions.storeId))
+    .where(and(saleScope, gte(saleTransactions.soldAt, start), lt(saleTransactions.soldAt, end), isNull(saleTransactions.voidedAt)))
     .orderBy(desc(saleTransactions.soldAt), asc(sales.id))
 
   const [[totals], [itemTotals], lowStock, recentSales] = await Promise.all([
@@ -59,12 +78,14 @@ export default defineEventHandler(async () => {
     id: number
     revenue: number
     soldAt: Date
+    storeId: number
+    storeName: string
     lines: Array<{ id: number; productId: number; productName: string; productVariant: string; quantity: number }>
   }>()
   for (const row of recentSales) {
     let receipt = recentByTransaction.get(row.id)
     if (!receipt) {
-      receipt = { id: row.id, revenue: row.revenue, soldAt: row.soldAt, lines: [] }
+      receipt = { id: row.id, revenue: row.revenue, soldAt: row.soldAt, storeId: row.storeId, storeName: row.storeName, lines: [] }
       recentByTransaction.set(row.id, receipt)
     }
     receipt.lines.push({
@@ -85,5 +106,6 @@ export default defineEventHandler(async () => {
     transactions: Number(totals?.transactions ?? 0),
     lowStock,
     recentSales: [...recentByTransaction.values()],
+    scope: scope.mode === 'all' ? 'all' : String(scope.store.id),
   }
 })

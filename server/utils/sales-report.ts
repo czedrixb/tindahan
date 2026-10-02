@@ -1,9 +1,11 @@
-import { and, desc, eq, gte, isNull, lt, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm'
 import type { DateRange } from './dates'
 import { storeDateKey } from './dates'
-import { products, sales, saleTransactions } from '../db/schema'
+import { products, storeProducts, stores, sales, saleTransactions } from '../db/schema'
 
-export async function getSalesTotals(range: DateRange) {
+const storeCondition = (storeIds: number[]) => inArray(saleTransactions.storeId, storeIds)
+
+export async function getSalesTotals(range: DateRange, storeIds: number[]) {
   const db = useDb()
   const [totals] = await db
     .select({
@@ -15,6 +17,7 @@ export async function getSalesTotals(range: DateRange) {
     .where(
       and(
         gte(saleTransactions.soldAt, range.start),
+        storeCondition(storeIds),
         lt(saleTransactions.soldAt, range.end),
         isNull(saleTransactions.voidedAt),
       ),
@@ -29,6 +32,7 @@ export async function getSalesTotals(range: DateRange) {
     .where(
       and(
         gte(saleTransactions.soldAt, range.start),
+        storeCondition(storeIds),
         lt(saleTransactions.soldAt, range.end),
         isNull(saleTransactions.voidedAt),
       ),
@@ -46,7 +50,7 @@ export async function getSalesTotals(range: DateRange) {
   }
 }
 
-export async function getTopProducts(range: DateRange, limit = 5) {
+export async function getTopProducts(range: DateRange, storeIds: number[], limit = 5) {
   const db = useDb()
   return db
     .select({
@@ -62,6 +66,7 @@ export async function getTopProducts(range: DateRange, limit = 5) {
     .where(
       and(
         gte(saleTransactions.soldAt, range.start),
+        storeCondition(storeIds),
         lt(saleTransactions.soldAt, range.end),
         isNull(saleTransactions.voidedAt),
       ),
@@ -78,7 +83,7 @@ export async function getTopProducts(range: DateRange, limit = 5) {
  * every day in the range is pre-seeded so a day with no sales still renders
  * as a zero bar instead of being skipped.
  */
-export async function getDailySeries(range: DateRange) {
+export async function getDailySeries(range: DateRange, storeIds: number[]) {
   const db = useDb()
   const rows = await db
     .select({
@@ -89,6 +94,7 @@ export async function getDailySeries(range: DateRange) {
     .where(
       and(
         gte(saleTransactions.soldAt, range.start),
+        storeCondition(storeIds),
         lt(saleTransactions.soldAt, range.end),
         isNull(saleTransactions.voidedAt),
       ),
@@ -108,12 +114,20 @@ export async function getDailySeries(range: DateRange) {
     .map(([date, revenue]) => ({ date, revenue }))
 }
 
-export async function getLowestStockProducts(limit = 5) {
+export async function getLowestStockProducts(storeIds: number[], limit = 5) {
   const db = useDb()
   return db
-    .select()
-    .from(products)
-    .where(eq(products.isActive, true))
-    .orderBy(products.stock)
+    .select({
+      id: products.id, name: products.name, variant: products.variant,
+      costPrice: storeProducts.costPrice, sellingPrice: storeProducts.sellingPrice,
+      stock: storeProducts.stock, lowStockThreshold: storeProducts.lowStockThreshold,
+      isActive: storeProducts.isActive, createdAt: products.createdAt, updatedAt: storeProducts.updatedAt,
+      storeId: stores.id, storeName: stores.name,
+    })
+    .from(storeProducts)
+    .innerJoin(products, eq(products.id, storeProducts.productId))
+    .innerJoin(stores, eq(stores.id, storeProducts.storeId))
+    .where(and(inArray(storeProducts.storeId, storeIds), eq(storeProducts.isActive, true)))
+    .orderBy(asc(storeProducts.stock))
     .limit(limit)
 }

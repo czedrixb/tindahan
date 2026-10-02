@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { TransactionType } from '../db/schema'
-import { products, inventoryTransactions } from '../db/schema'
+import { products, storeProducts, inventoryTransactions } from '../db/schema'
 
 // The concrete transaction type differs between the PGlite and postgres-js
 // drivers; both expose the same Drizzle query builder API used here.
@@ -9,6 +9,7 @@ type Tx = any
 
 export interface ApplyStockChangeInput {
   productId: number
+  storeId: number
   /** Signed change to apply to stock. Negative for sales/damage/etc, positive for restocks. */
   delta: number
   type: TransactionType
@@ -20,15 +21,16 @@ export interface ApplyStockChangeInput {
 async function writeStockChange(
   tx: Tx,
   productId: number,
+  storeId: number,
   computeDelta: (previousStock: number) => number,
   type: TransactionType,
   reason: string | null,
   saleId: number | null,
 ) {
   const [product] = await tx
-    .select({ stock: products.stock })
-    .from(products)
-    .where(eq(products.id, productId))
+    .select({ stock: storeProducts.stock })
+    .from(storeProducts)
+    .where(and(eq(storeProducts.productId, productId), eq(storeProducts.storeId, storeId)))
     .for('update')
 
   if (!product) {
@@ -44,12 +46,18 @@ async function writeStockChange(
   }
 
   await tx
-    .update(products)
+    .update(storeProducts)
     .set({ stock: newStock, updatedAt: new Date() })
-    .where(eq(products.id, productId))
+    .where(and(eq(storeProducts.productId, productId), eq(storeProducts.storeId, storeId)))
+
+  // Keep Davao's legacy balance current until the post-rollout cleanup migration.
+  if (storeId === 1) {
+    await tx.update(products).set({ stock: newStock, updatedAt: new Date() }).where(eq(products.id, productId))
+  }
 
   await tx.insert(inventoryTransactions).values({
     productId,
+    storeId,
     type,
     quantity: delta,
     previousStock,
@@ -68,12 +76,13 @@ async function writeStockChange(
  * Must be called inside a db transaction.
  */
 export async function applyStockChange(tx: Tx, input: ApplyStockChangeInput) {
-  const { productId, delta, type, reason = null, saleId = null } = input
-  return writeStockChange(tx, productId, () => delta, type, reason, saleId)
+  const { productId, storeId, delta, type, reason = null, saleId = null } = input
+  return writeStockChange(tx, productId, storeId, () => delta, type, reason, saleId)
 }
 
 export interface SetAbsoluteStockInput {
   productId: number
+  storeId: number
   /** The stock value the product should end up at, e.g. a physical count. */
   target: number
   type: TransactionType
@@ -87,6 +96,6 @@ export interface SetAbsoluteStockInput {
  * possibly-stale earlier snapshot.
  */
 export async function setAbsoluteStock(tx: Tx, input: SetAbsoluteStockInput) {
-  const { productId, target, type, reason = null } = input
-  return writeStockChange(tx, productId, (previousStock) => target - previousStock, type, reason, null)
+  const { productId, storeId, target, type, reason = null } = input
+  return writeStockChange(tx, productId, storeId, (previousStock) => target - previousStock, type, reason, null)
 }
